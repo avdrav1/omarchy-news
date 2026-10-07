@@ -46,10 +46,6 @@ SHORT_LEAGUE_NAMES = {
     "soccer/uefa.champions": "UCL",
 }
 
-# Every score change is worth an alert only where scoring is rare; in
-# basketball or baseball that would be a notification a minute.
-SCORE_ALERT_SPORTS = {"soccer", "hockey"}
-
 NS = {
     "dc": "http://purl.org/dc/elements/1.1/",
     "media": "http://search.yahoo.com/mrss/",
@@ -187,10 +183,12 @@ def game_text(game):
     return f"{away['abbr']} {away['score']}–{home['score']} {home['abbr']} · {game['detail']}"
 
 
-def ticker_games(games, now):
-    """Live first, then finals from the last 12 h, then games in the next 24 h.
+def ticker_games(games, now, favourites_only=False):
+    """Live first, then finals from the last 12 h, then upcoming games.
 
-    Favourites lead within each band; ESPN order is kept otherwise.
+    Upcoming means the next 24 h, or the next 7 days for a favourite, so a
+    Sunday NFL game shows from early in the week. Favourites lead within
+    each band; ESPN order is kept otherwise.
     """
     def start_ts(game):
         start = parse_time(game["start"])
@@ -198,10 +196,13 @@ def ticker_games(games, now):
 
     bands = {"in": [], "post": [], "pre": []}
     for game in games:
+        if favourites_only and not game["favorite"]:
+            continue
         ts = start_ts(game)
         if game["state"] == "post" and now - ts > 12 * 3600:
             continue
-        if game["state"] == "pre" and ts - now > 24 * 3600:
+        horizon = 7 * 86400 if game["favorite"] else 24 * 3600
+        if game["state"] == "pre" and ts - now > horizon:
             continue
         bands.setdefault(game["state"], []).append(game)
     ordered = []
@@ -241,8 +242,54 @@ def parse_cooking(raw):
 
 # -------------------------------------------------------------------- alerts
 
+def score_of(side):
+    try:
+        return int(side["score"])
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
+def leader(away, home):
+    return "away" if away > home else "home" if home > away else "tie"
+
+
+def in_game_alert(game, old):
+    """The in-game alert for one score change, or None.
+
+    Each sport alerts at the rate its scoring merits: every goal in soccer and
+    hockey; touchdowns and field goals in American football (extra points and
+    two-point tries ride along with the touchdown); lead changes and ties in
+    baseball. Basketball scores too often for anything but the final.
+    """
+    sport = game["sport"]
+    away, home = game["away"], game["home"]
+    was = score_of(old["away"]), score_of(old["home"])
+    now = score_of(away), score_of(home)
+    if was == now:
+        return None
+    if sport in ("soccer", "hockey"):
+        return "Goal"
+    if sport == "football":
+        side = away if now[0] - was[0] >= now[1] - was[1] else home
+        gained = max(now[0] - was[0], now[1] - was[1])
+        if gained >= 6:
+            return f"Touchdown {side['short'] or side['abbr']}"
+        if gained >= 3:
+            return f"Field goal {side['short'] or side['abbr']}"
+        return None
+    if sport == "baseball":
+        before, after = leader(*was), leader(*now)
+        if before == after:
+            return None
+        if after == "tie":
+            return "Tied"
+        side = away if after == "away" else home
+        return f"{side['short'] or side['abbr']} take the lead"
+    return None
+
+
 def alert_events(prev_games, games, mode):
-    """Score changes (rare-scoring sports) and finals since the previous fetch.
+    """In-game scoring alerts and finals since the previous fetch.
 
     Games not in the previous cache never alert, so the first fetch, a new
     league, or a cold cache stays quiet.
@@ -257,13 +304,13 @@ def alert_events(prev_games, games, mode):
             continue
         away, home = game["away"], game["home"]
         line = f"{away['abbr']} {away['score']}–{home['score']} {home['abbr']}"
-        scored = (old["away"]["score"], old["home"]["score"]) != (away["score"], home["score"])
         if game["state"] == "post" and old["state"] != "post":
             events.append({"title": f"Final: {line}", "body": game["leagueName"], "link": game["link"]})
-        elif game["state"] == "in" and scored and game["sport"] in SCORE_ALERT_SPORTS:
-            label = "Goal" if game["sport"] in ("soccer", "hockey") else "Score"
-            events.append({"title": f"{label}: {line}", "body": f"{game['leagueName']} · {game['detail']}",
-                           "link": game["link"]})
+        elif game["state"] == "in":
+            label = in_game_alert(game, old)
+            if label:
+                events.append({"title": f"{label}: {line}", "body": f"{game['leagueName']} · {game['detail']}",
+                               "link": game["link"]})
     return events
 
 
@@ -392,6 +439,7 @@ def run(args):
         out["live"] = any(g["state"] == "in" for g in out.get("games", []))
         out["ticker"] = {
             "scores": ticker_games(out.get("games", []), now),
+            "favorites": ticker_games(out.get("games", []), now, favourites_only=True),
             "cooking": [{"text": c["title"], "link": c["link"]} for c in out.get("cooking", [])[:5]],
         }
         out["updatedAt"] = now

@@ -502,6 +502,17 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      label: "Games"
+      options: [
+        { value: "favorites", label: "Favourites" },
+        { value: "all", label: "All" }
+      ]
+      value: panel.widget.tickerTeams
+      onChanged: function(v) { panel.widget.saveSetting("tickerTeams", v) }
+    }
+
+    ChoiceRow {
+      width: parent.width
       label: "Width"
       options: [
         { value: "160", label: "S" },

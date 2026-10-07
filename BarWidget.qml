@@ -37,6 +37,7 @@ Panel {
   readonly property string leagues: String(setting("leagues", "soccer/eng.1,basketball/nba"))
   readonly property string teams: String(setting("teams", ""))
   readonly property string tickerMode: String(setting("tickerMode", "both"))
+  readonly property string tickerTeams: String(setting("tickerTeams", "favorites"))
   readonly property string alerts: String(setting("alerts", "favorites"))
   readonly property int hourCycle: Number(setting("hourCycle", 12)) === 24 ? 24 : 12
   readonly property int tickerWidth: Math.max(80, Math.min(800, Number(setting("tickerWidth", 240)) || 240))
@@ -47,6 +48,7 @@ Panel {
     leagues: "soccer/eng.1,basketball/nba",
     teams: "",
     tickerMode: "both",
+    tickerTeams: "favorites",
     alerts: "favorites",
     hourCycle: 12,
     tickerWidth: 240,
@@ -79,7 +81,12 @@ Panel {
     var out = []
     var ticker = feed && feed.ticker ? feed.ticker : null
     if (!ticker) return out
-    if (tickerMode !== "cooking") out = out.concat(ticker.scores || [])
+    if (tickerMode !== "cooking") {
+      // Favourites only while any of them has a game in the ticker window;
+      // otherwise every game, so the ticker never goes blank on an off day.
+      var favourites = ticker.favorites || []
+      out = out.concat(tickerTeams === "favorites" && favourites.length > 0 ? favourites : (ticker.scores || []))
+    }
     if (tickerMode !== "scores") {
       out = out.concat((ticker.cooking || []).map(function(item) {
         return { text: item.text, link: item.link, live: false, cooking: true }

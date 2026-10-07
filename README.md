@@ -43,6 +43,7 @@ Edited from the popup's settings page, or inline on the widget's entry in
 | `leagues` | `soccer/eng.1,basketball/nba` | ESPN `sport/league` paths, e.g. `football/nfl`, `hockey/nhl`, `baseball/mlb`, `soccer/uefa.champions` |
 | `teams` | `""` | Favourite team abbreviations or names; they lead the ticker and drive alerts |
 | `tickerMode` | `both` | `both`, `scores` or `cooking` |
+| `tickerTeams` | `favorites` | `favorites` shows only your teams' games while any is on (live, final in the last 12 h, or within 7 days); otherwise all games. `all` always shows every game |
 | `alerts` | `favorites` | `off`, `favorites` or `all` |
 | `hourCycle` | `12` | `12` or `24` for kickoff times |
 | `tickerWidth` | `240` | Ticker width in px (fixed, so the bar layout stays put) |
@@ -60,8 +61,11 @@ otherwise; cooking every 15 min. Failed sources keep their last good data.
 Alerts are desktop notifications sent by the helper (`omarchy-notification-send`),
 so each event fires once regardless of monitor count:
 
-- **Goal** on every score change in soccer and hockey (other sports score too often)
-- **Final** when any game ends
+- **Soccer, hockey:** every goal
+- **American football:** touchdowns and field goals (the extra point or two-point try rides along with the touchdown)
+- **Baseball:** lead changes and ties, not every run
+- **Basketball:** final only (it scores too often for anything else)
+- **Every sport:** the final score
 
 Games seen for the first time never alert, so a cold cache or a new league stays quiet.
 

@@ -20,6 +20,8 @@ loader.exec_module(fetcher)
 NOW = dt.datetime(2026, 10, 10, 12, 0, tzinfo=dt.timezone.utc).timestamp()
 EPL = "soccer/eng.1"
 NBA = "basketball/nba"
+NFL = "football/nfl"
+MLB = "baseball/mlb"
 
 
 def iso(hours_from_now):
@@ -135,6 +137,28 @@ class AlertTests(FetchCase):
         self.run_fetch(alerts="off", now=NOW + 60)
         self.assertEqual(self.alerts(), [])
 
+    def test_football_alerts_touchdowns_and_field_goals_not_extra_points(self):
+        scores = [(0, 0), (0, 6), (0, 7), (3, 7), (10, 7)]
+        for minute, score in enumerate(scores):
+            self.serve(NFL, board("NFL", event("5", "SEA", "SF", "in", score, f"Q2 {10 - minute}:00")))
+            self.run_fetch(leagues=NFL, teams="SF", now=NOW + 60 * minute)
+        self.assertEqual(self.alerts(), [
+            "Touchdown SF: SEA 0–6 SF",
+            "Field goal SEA: SEA 3–7 SF",
+            "Touchdown SEA: SEA 10–7 SF",
+        ])
+
+    def test_baseball_alerts_lead_changes_and_ties_not_every_run(self):
+        scores = [(0, 0), (1, 0), (2, 0), (2, 2), (2, 3), (2, 5)]
+        for inning, score in enumerate(scores):
+            self.serve(MLB, board("MLB", event("7", "SF", "LAD", "in", score, f"Top {inning + 1}")))
+            self.run_fetch(leagues=MLB, teams="SF", now=NOW + 60 * inning)
+        self.assertEqual(self.alerts(), [
+            "SF take the lead: SF 1–0 LAD",
+            "Tied: SF 2–2 LAD",
+            "LAD take the lead: SF 2–3 LAD",
+        ])
+
 
 class ScheduleTests(FetchCase):
     def mtime(self):
@@ -199,6 +223,18 @@ class TickerTests(FetchCase):
         ))
         texts = [item["text"].split(" · ")[0] for item in self.run_fetch()["ticker"]["scores"]]
         self.assertEqual(texts, ["TOT 1–1 FUL", "NEW 2–2 BRE", "CHE @ ARS", "LEE @ MCI"])
+
+    def test_favourites_list_holds_only_favourites_and_looks_a_week_ahead(self):
+        self.serve(NFL, board(
+            "NFL",
+            event("fav-sunday", "IND", "PIT", "pre", start=4 * 24),
+            event("other-sunday", "NYG", "DAL", "pre", start=4 * 24),
+            event("fav-far", "PIT", "BAL", "pre", start=9 * 24),
+            event("other-soon", "KC", "DEN", "pre", start=2),
+        ))
+        ticker = self.run_fetch(leagues=NFL, teams="PIT")["ticker"]
+        self.assertEqual([t["text"].split(" · ")[0] for t in ticker["favorites"]], ["IND @ PIT"])
+        self.assertEqual([t["text"].split(" · ")[0] for t in ticker["scores"]], ["IND @ PIT", "KC @ DEN"])
 
 
 if __name__ == "__main__":
