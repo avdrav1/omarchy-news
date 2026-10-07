@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""Fetch sports scores (ESPN) and NYT Cooking articles into one cache file.
+
+The bar widget runs this every few seconds from every monitor. Only one copy
+does any work at a time (flock), and it only touches the network when the
+cached data is older than the interval that applies: short while a game is
+live, long otherwise. The widget watches the cache file, so a write is what
+updates the bar. Score changes and finals are diffed against the previous
+cache and announced as desktop notifications from here, which keeps alerts to
+one per event however many monitors are attached.
+
+Standard library only.
+"""
+
+import argparse
+import concurrent.futures
+import collections
+import datetime as dt
+import email.utils
+import fcntl
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+
+VERSION = 1
+ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard"
+NYT_FOOD_FEED = "https://rss.nytimes.com/services/xml/rss/nyt/DiningandWine.xml"
+COOKING_HOST = "cooking.nytimes.com"
+USER_AGENT = "av.news/1 (+omarchy shell plugin)"
+
+# ESPN's league abbreviation is sometimes the full name ("Premier League").
+SHORT_LEAGUE_NAMES = {
+    "soccer/eng.1": "EPL",
+    "soccer/esp.1": "LaLiga",
+    "soccer/ita.1": "Serie A",
+    "soccer/ger.1": "Bundesliga",
+    "soccer/fra.1": "Ligue 1",
+    "soccer/usa.1": "MLS",
+    "soccer/uefa.champions": "UCL",
+}
+
+# Every score change is worth an alert only where scoring is rare; in
+# basketball or baseball that would be a notification a minute.
+SCORE_ALERT_SPORTS = {"soccer", "hockey"}
+
+NS = {
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "media": "http://search.yahoo.com/mrss/",
+}
+
+
+def parse_args(argv):
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("--leagues", default="soccer/eng.1,basketball/nba",
+                   help="comma-separated ESPN sport/league paths")
+    p.add_argument("--teams", default="",
+                   help="comma-separated favourite team abbreviations or names")
+    p.add_argument("--alerts", choices=["off", "favorites", "all"], default="favorites")
+    p.add_argument("--hour-cycle", type=int, choices=[12, 24], default=12)
+    p.add_argument("--live-interval", type=int, default=30, help="seconds")
+    p.add_argument("--idle-interval", type=int, default=300, help="seconds")
+    p.add_argument("--news-interval", type=int, default=900, help="seconds")
+    p.add_argument("--cache-dir", default=default_cache_dir())
+    p.add_argument("--force", action="store_true", help="ignore intervals")
+    p.add_argument("--fixtures", default="",
+                   help="read responses from this directory instead of the network")
+    p.add_argument("--notify-cmd", default=os.environ.get("AV_NEWS_NOTIFY_CMD", "omarchy-notification-send"),
+                   help="notification program; empty disables alerts")
+    p.add_argument("--now", type=float, default=None, help=argparse.SUPPRESS)
+    return p.parse_args(argv)
+
+
+def default_cache_dir():
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "av.news")
+
+
+def split_list(value):
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
+# --------------------------------------------------------------------- fetch
+
+def fixture_name(url):
+    """Map a URL to a file name, so tests and replays can stand in for it."""
+    parsed = urllib.parse.urlparse(url)
+    return (parsed.netloc + parsed.path).replace("/", "_")
+
+
+def fetch(url, fixtures):
+    if fixtures:
+        with open(os.path.join(fixtures, fixture_name(url)), "rb") as fh:
+            return fh.read()
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return resp.read()
+
+
+# -------------------------------------------------------------------- scores
+
+def parse_time(value):
+    if not value:
+        return None
+    try:
+        return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def format_kickoff(start, now, hour_cycle):
+    """Local start time: "7:30 PM" today, "Sat 7:30 PM" within a week."""
+    if start is None:
+        return ""
+    local = start.astimezone()
+    clock = local.strftime("%H:%M") if hour_cycle == 24 else local.strftime("%I:%M %p").lstrip("0")
+    today = dt.datetime.fromtimestamp(now).astimezone().date()
+    days = (local.date() - today).days
+    if days == 0:
+        return clock
+    if 0 < days < 7:
+        return local.strftime("%a ") + clock
+    return local.strftime("%b %d ").replace(" 0", " ") + clock
+
+
+def team_matches(team, favourites):
+    if not favourites:
+        return False
+    keys = {str(team.get(k, "")).lower() for k in ("abbr", "name", "short")}
+    return any(fav.lower() in keys for fav in favourites)
+
+
+def parse_scoreboard(path, raw, favourites, now, hour_cycle):
+    data = json.loads(raw)
+    sport = path.split("/", 1)[0]
+    leagues = data.get("leagues") or [{}]
+    league_name = leagues[0].get("name") or path
+    league_short = SHORT_LEAGUE_NAMES.get(path) or leagues[0].get("abbreviation") or league_name
+    games = []
+    for event in data.get("events") or []:
+        comp = (event.get("competitions") or [{}])[0]
+        sides = {}
+        for c in comp.get("competitors") or []:
+            team = c.get("team") or {}
+            sides[c.get("homeAway")] = {
+                "abbr": team.get("abbreviation") or "",
+                "name": team.get("displayName") or "",
+                "short": team.get("shortDisplayName") or "",
+                "score": str(c.get("score") or "0"),
+                "logo": team.get("logo") or "",
+                "winner": c.get("winner") is True,
+            }
+        if "home" not in sides or "away" not in sides:
+            continue
+        status = (event.get("status") or {}).get("type") or {}
+        state = status.get("state") or "pre"
+        start = parse_time(event.get("date"))
+        detail = format_kickoff(start, now, hour_cycle) if state == "pre" else (status.get("shortDetail") or "")
+        links = event.get("links") or []
+        games.append({
+            "id": str(event.get("id") or ""),
+            "league": path,
+            "leagueName": league_name,
+            "leagueShort": league_short,
+            "sport": sport,
+            "state": state,
+            "detail": detail,
+            "start": start.isoformat() if start else "",
+            "home": sides["home"],
+            "away": sides["away"],
+            "favorite": team_matches(sides["home"], favourites) or team_matches(sides["away"], favourites),
+            "link": links[0].get("href", "") if links else "",
+        })
+    return {"id": path, "name": league_name, "short": league_short}, games
+
+
+def game_text(game):
+    away, home = game["away"], game["home"]
+    if game["state"] == "pre":
+        return f"{away['abbr']} @ {home['abbr']} · {game['detail']}"
+    return f"{away['abbr']} {away['score']}–{home['score']} {home['abbr']} · {game['detail']}"
+
+
+def ticker_games(games, now):
+    """Live first, then finals from the last 12 h, then games in the next 24 h.
+
+    Favourites lead within each band; ESPN order is kept otherwise.
+    """
+    def start_ts(game):
+        start = parse_time(game["start"])
+        return start.timestamp() if start else 0
+
+    bands = {"in": [], "post": [], "pre": []}
+    for game in games:
+        ts = start_ts(game)
+        if game["state"] == "post" and now - ts > 12 * 3600:
+            continue
+        if game["state"] == "pre" and ts - now > 24 * 3600:
+            continue
+        bands.setdefault(game["state"], []).append(game)
+    ordered = []
+    for state in ("in", "post", "pre"):
+        band = bands.get(state, [])
+        ordered += [g for g in band if g["favorite"]] + [g for g in band if not g["favorite"]]
+    return [{"text": game_text(g), "link": g["link"], "live": g["state"] == "in"} for g in ordered[:12]]
+
+
+# ------------------------------------------------------------------- cooking
+
+def parse_cooking(raw):
+    root = ET.fromstring(raw)
+    items = []
+    for item in root.findall("channel/item"):
+        link = (item.findtext("link") or "").strip()
+        if urllib.parse.urlparse(link).netloc != COOKING_HOST:
+            continue
+        published = ""
+        pub = item.findtext("pubDate")
+        if pub:
+            try:
+                published = email.utils.parsedate_to_datetime(pub).isoformat()
+            except (TypeError, ValueError):
+                published = ""
+        media = item.find("media:content", NS)
+        items.append({
+            "title": (item.findtext("title") or "").strip(),
+            "link": link,
+            "description": (item.findtext("description") or "").strip(),
+            "author": (item.findtext("dc:creator", namespaces=NS) or "").strip(),
+            "published": published,
+            "image": media.get("url", "") if media is not None else "",
+        })
+    return items
+
+
+# -------------------------------------------------------------------- alerts
+
+def alert_events(prev_games, games, mode):
+    """Score changes (rare-scoring sports) and finals since the previous fetch.
+
+    Games not in the previous cache never alert, so the first fetch, a new
+    league, or a cold cache stays quiet.
+    """
+    if mode == "off":
+        return []
+    before = {(g["league"], g["id"]): g for g in prev_games}
+    events = []
+    for game in games:
+        old = before.get((game["league"], game["id"]))
+        if old is None or (mode == "favorites" and not game["favorite"]):
+            continue
+        away, home = game["away"], game["home"]
+        line = f"{away['abbr']} {away['score']}–{home['score']} {home['abbr']}"
+        scored = (old["away"]["score"], old["home"]["score"]) != (away["score"], home["score"])
+        if game["state"] == "post" and old["state"] != "post":
+            events.append({"title": f"Final: {line}", "body": game["leagueName"], "link": game["link"]})
+        elif game["state"] == "in" and scored and game["sport"] in SCORE_ALERT_SPORTS:
+            label = "Goal" if game["sport"] in ("soccer", "hockey") else "Score"
+            events.append({"title": f"{label}: {line}", "body": f"{game['leagueName']} · {game['detail']}",
+                           "link": game["link"]})
+    return events
+
+
+def send_alerts(events, cmd):
+    if not cmd:
+        return
+    for event in events:
+        argv = [cmd, "--app-name", "News", "-u", "normal", event["title"], event["body"]]
+        if event["link"]:
+            argv += ["--exec", "xdg-open", event["link"]]
+        try:
+            subprocess.run(argv, check=False, timeout=10,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"av-news-fetch: notification failed: {exc}", file=sys.stderr)
+
+
+# --------------------------------------------------------------------- cache
+
+def needs_live_polling(games, now, idle_interval):
+    """Live games, and games due to start before the next idle poll.
+
+    A "pre" game whose kickoff is hours past (postponed, delayed) does not
+    count, or it would hold the short interval forever.
+    """
+    for game in games:
+        if game.get("state") == "in":
+            return True
+        start = parse_time(game.get("start"))
+        if game.get("state") == "pre" and start and -3 * 3600 < start.timestamp() - now < idle_interval:
+            return True
+    return False
+
+
+def load_cache(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) and data.get("version") == VERSION else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_atomic(path, data):
+    directory = os.path.dirname(path)
+    fd, tmp = tempfile.mkstemp(prefix=".feed-", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def fingerprint(args, leagues, favourites):
+    key = json.dumps([leagues, sorted(f.lower() for f in favourites), args.hour_cycle])
+    return hashlib.sha1(key.encode()).hexdigest()[:12]
+
+
+# ---------------------------------------------------------------------- main
+
+def run(args):
+    now = args.now if args.now is not None else time.time()
+    leagues = split_list(args.leagues)
+    favourites = split_list(args.teams)
+    os.makedirs(args.cache_dir, exist_ok=True)
+    cache_path = os.path.join(args.cache_dir, "feed.json")
+
+    with open(os.path.join(args.cache_dir, "lock"), "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 0  # Another monitor's widget is already fetching.
+
+        prev = load_cache(cache_path)
+        config = fingerprint(args, leagues, favourites)
+        reconfigured = prev.get("config") != config
+        score_interval = args.live_interval if needs_live_polling(prev.get("games", []), now, args.idle_interval) \
+            else args.idle_interval
+        scores_due = args.force or reconfigured or now - prev.get("scoresFetchedAt", 0) >= score_interval
+        news_due = args.force or not prev or now - prev.get("newsFetchedAt", 0) >= args.news_interval
+        if not scores_due and not news_due:
+            return 0
+
+        out = dict(prev)
+        out.update(version=VERSION, config=config, errors=[])
+        prev_games = prev.get("games", []) if not reconfigured else []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            board_jobs = {path: pool.submit(fetch, ESPN_SCOREBOARD.format(path=path), args.fixtures)
+                          for path in leagues} if scores_due else {}
+            news_job = pool.submit(fetch, NYT_FOOD_FEED, args.fixtures) if news_due else None
+
+            if scores_due:
+                kept = collections.defaultdict(list)
+                for g in prev.get("games", []):
+                    kept[g["league"]].append(g)
+                league_meta, games = [], []
+                for path, job in board_jobs.items():
+                    try:
+                        meta, league_games = parse_scoreboard(path, job.result(), favourites, now, args.hour_cycle)
+                        meta["error"] = ""
+                    except Exception as exc:  # Keep the last good data for this league.
+                        meta = {"id": path, "name": path, "short": path, "error": str(exc)}
+                        league_games = kept.get(path, []) if not reconfigured else []
+                        out["errors"].append(f"{path}: {exc}")
+                    league_meta.append(meta)
+                    games += league_games
+                out["leagues"] = league_meta
+                out["games"] = games
+                out["scoresFetchedAt"] = now
+                if not reconfigured:
+                    send_alerts(alert_events(prev_games, games, args.alerts), args.notify_cmd)
+
+            if news_job is not None:
+                try:
+                    out["cooking"] = parse_cooking(news_job.result())
+                    out["newsFetchedAt"] = now
+                except Exception as exc:
+                    out.setdefault("cooking", [])
+                    out["errors"].append(f"NYT Cooking: {exc}")
+                    # Retry in a minute rather than on every widget tick.
+                    out["newsFetchedAt"] = now - args.news_interval + 60
+
+        out["live"] = any(g["state"] == "in" for g in out.get("games", []))
+        out["ticker"] = {
+            "scores": ticker_games(out.get("games", []), now),
+            "cooking": [{"text": c["title"], "link": c["link"]} for c in out.get("cooking", [])[:5]],
+        }
+        out["updatedAt"] = now
+        write_atomic(cache_path, out)
+    return 0
+
+
+def main(argv=None):
+    return run(parse_args(sys.argv[1:] if argv is None else argv))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

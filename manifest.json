@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "av.news",
+  "name": "News & Scores",
+  "version": "1.0.0",
+  "author": "av",
+  "description": "Live sports scores (ESPN) and NYT Cooking in a scrolling bar ticker with a detail popup",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "News & Scores",
+    "description": "Live sports scores and NYT Cooking ticker",
+    "category": "Info",
+    "defaultSection": "left",
+    "allowMultiple": false,
+    "defaults": {
+      "leagues": "soccer/eng.1,basketball/nba",
+      "teams": "",
+      "tickerMode": "both",
+      "alerts": "favorites",
+      "hourCycle": 12,
+      "tickerWidth": 240,
+      "tickerSpeed": 40,
+      "displayMode": "full"
+    },
+    "schema": [
+      { "key": "leagues", "type": "string", "label": "Leagues", "defaultValue": "soccer/eng.1,basketball/nba", "description": "Comma-separated ESPN sport/league paths, e.g. soccer/eng.1, basketball/nba, football/nfl, hockey/nhl, baseball/mlb" },
+      { "key": "teams", "type": "string", "label": "Favourite teams", "defaultValue": "", "description": "Comma-separated team abbreviations or names; favourites lead the ticker and get alerts" },
+      { "key": "tickerMode", "type": "enum", "label": "Ticker", "defaultValue": "both", "options": ["both", "scores", "cooking"] },
+      { "key": "alerts", "type": "enum", "label": "Alerts", "defaultValue": "favorites", "options": ["off", "favorites", "all"] },
+      { "key": "hourCycle", "type": "enum", "label": "Clock", "defaultValue": 12, "options": [12, 24] },
+      { "key": "tickerWidth", "type": "integer", "label": "Ticker width", "defaultValue": 240, "min": 80, "max": 800, "step": 10 },
+      { "key": "tickerSpeed", "type": "integer", "label": "Ticker speed (px/s)", "defaultValue": 40, "min": 10, "max": 200, "step": 5 },
+      { "key": "displayMode", "type": "enum", "label": "Display", "defaultValue": "full", "options": ["full", "icon", "text"] }
+    ]
+  }
+}

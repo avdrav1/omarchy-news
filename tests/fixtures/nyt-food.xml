@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nyt="http://www.nytimes.com/namespaces/rss/2.0" version="2.0">
+  <channel>
+    <title>NYT &gt; Food</title>
+    <link>https://www.nytimes.com/section/food</link>
+    <atom:link href="https://rss.nytimes.com/services/xml/rss/nyt/DiningandWine.xml" rel="self" type="application/rss+xml"></atom:link>
+    <description></description>
+    <language>en-us</language>
+    <copyright>Copyright 2026 The New York Times Company</copyright>
+    <lastBuildDate>Wed, 07 Oct 2026 08:15:38 +0000</lastBuildDate>
+    <pubDate>Wed, 07 Oct 2026 02:38:54 +0000</pubDate>
+    <image>
+      <title>NYT &gt; Food</title>
+      <url>https://static01.nyt.com/images/misc/NYT_logo_rss_250x40.png</url>
+      <link>https://www.nytimes.com/section/food</link>
+    </image>
+    <item>
+      <title>Restaurant Review: Burmese Bites in New York</title>
+      <link>https://www.nytimes.com/2026/10/06/dining/restaurant-review-burmese-bites-nyc.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/06/dining/restaurant-review-burmese-bites-nyc.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/06/dining/restaurant-review-burmese-bites-nyc.html" rel="standout"></atom:link>
+      <description>Burmese Bites has traveled a three-decade road, from street fairs to a market stall to this Astoria spot where the fine-tuned cooking enthralls.</description>
+      <dc:creator>Ligaya Mishan</dc:creator>
+      <pubDate>Tue, 06 Oct 2026 15:59:02 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">Burmese Bites (Queens, NY, Restaurant)</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Restaurants</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Astoria (Queens, NY)</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Thway, Myo Lin</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Nant, Rebecca</category>
+      <media:content height="1801" medium="image" url="https://static01.nyt.com/images/2026/10/05/multimedia/rest-burmese5-mtpq/rest-burmese5-mtpq-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Yuvraj Khanna for The New York Times</media:credit>
+    </item><item>
+      <title>Red Palm Oil Makes These Dishes West African Dishes Even More Special</title>
+      <link>https://cooking.nytimes.com/article/red-palm-oil-west-african-food-culture</link>
+      <guid isPermaLink="true">https://cooking.nytimes.com/article/red-palm-oil-west-african-food-culture</guid>
+      <atom:link href="https://cooking.nytimes.com/article/red-palm-oil-west-african-food-culture" rel="standout"></atom:link>
+      <description>It’s also a conduit to West African food culture.</description>
+      <dc:creator>Yewande Komolafe</dc:creator>
+      <pubDate>Tue, 06 Oct 2026 15:59:10 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Oils and Fats</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Cooking and Cookbooks</category>
+      <media:content height="1800" medium="image" url="https://static01.nyt.com/images/2026/10/05/multimedia/05FD-KOMOLAFE-EBEH-promo-ktzq/05FD-KOMOLAFE-EBEH-promo-ktzq-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Kelly Marshall for The New York Times. Food Stylist: Monica Pierini. Prop Stylist: Paige Hicks.</media:credit>
+    </item><item>
+      <title>5 Tips on the Best Mac and Cheese</title>
+      <link>https://cooking.nytimes.com/article/best-mac-and-cheese-tips</link>
+      <guid isPermaLink="true">https://cooking.nytimes.com/article/best-mac-and-cheese-tips</guid>
+      <atom:link href="https://cooking.nytimes.com/article/best-mac-and-cheese-tips" rel="standout"></atom:link>
+      <description>And five more tips that’ll change how you make everyone’s favorite.</description>
+      <dc:creator>Genevieve Ko</dc:creator>
+      <pubDate>Tue, 06 Oct 2026 18:00:11 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Cooking and Cookbooks</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Recipes</category>
+      <category domain="">Cooking 101</category>
+      <media:content height="1799" medium="image" url="https://static01.nyt.com/images/2026/10/06/multimedia/06FD-COOKING101-MACREX-topart-2-vhkq/06FD-COOKING101-MACREX-topart-2-vhkq-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Rachel Vanni for The New York Times. Food Stylist: Monica Pierini.</media:credit>
+      <media:description>Genevieve Ko’s creamy mac and cheese with buttered crumbs.</media:description>
+    </item>
+  </channel>
+</rss>
