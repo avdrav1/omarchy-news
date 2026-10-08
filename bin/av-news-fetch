@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch sports scores (ESPN) and NYT Cooking articles into one cache file.
+"""Fetch sports scores (ESPN) and news feeds (NYT by default) into one cache file.
 
 The bar widget runs this every few seconds from every monitor. Only one copy
 does any work at a time (flock), and it only touches the network when the
@@ -29,11 +29,20 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = 1
+VERSION = 2
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard"
-NYT_FOOD_FEED = "https://rss.nytimes.com/services/xml/rss/nyt/DiningandWine.xml"
-COOKING_HOST = "cooking.nytimes.com"
+NYT_FEED = "https://rss.nytimes.com/services/xml/rss/nyt/{section}.xml"
 USER_AGENT = "av.news/1 (+omarchy shell plugin)"
+
+# Article sections in display order. News and business read any RSS or Atom
+# feed the user configures; cooking is NYT Cooking, which has no feed of its
+# own and comes out of the NYT Food feed by link host.
+SECTIONS = {
+    "news": {"label": "News", "default": NYT_FEED.format(section="HomePage"), "host": None},
+    "business": {"label": "Business", "default": NYT_FEED.format(section="Business"), "host": None},
+    "cooking": {"label": "NYT Cooking", "default": NYT_FEED.format(section="DiningandWine"),
+                "host": "cooking.nytimes.com"},
+}
 
 # ESPN's league abbreviation is sometimes the full name ("Premier League").
 SHORT_LEAGUE_NAMES = {
@@ -46,6 +55,7 @@ SHORT_LEAGUE_NAMES = {
     "soccer/uefa.champions": "UCL",
 }
 
+ATOM = "{http://www.w3.org/2005/Atom}"
 NS = {
     "dc": "http://purl.org/dc/elements/1.1/",
     "media": "http://search.yahoo.com/mrss/",
@@ -63,6 +73,8 @@ def parse_args(argv):
     p.add_argument("--live-interval", type=int, default=30, help="seconds")
     p.add_argument("--idle-interval", type=int, default=300, help="seconds")
     p.add_argument("--news-interval", type=int, default=900, help="seconds")
+    p.add_argument("--news-feed", default="", help="RSS/Atom URL for the News tab (empty: NYT Top Stories)")
+    p.add_argument("--business-feed", default="", help="RSS/Atom URL for the Business tab (empty: NYT Business)")
     p.add_argument("--cache-dir", default=default_cache_dir())
     p.add_argument("--force", action="store_true", help="ignore intervals")
     p.add_argument("--fixtures", default="",
@@ -212,32 +224,67 @@ def ticker_games(games, now, favourites_only=False):
     return [{"text": game_text(g), "link": g["link"], "live": g["state"] == "in"} for g in ordered[:12]]
 
 
-# ------------------------------------------------------------------- cooking
+# ------------------------------------------------------------------ articles
 
-def parse_cooking(raw):
+def section_url(args, section):
+    configured = {"news": args.news_feed, "business": args.business_feed}.get(section, "")
+    return configured.strip() or SECTIONS[section]["default"]
+
+
+def rss_date(value):
+    try:
+        return email.utils.parsedate_to_datetime(value).isoformat() if value else ""
+    except (TypeError, ValueError):
+        return ""
+
+
+def iso_date(value):
+    parsed = parse_time(value)
+    return parsed.isoformat() if parsed else ""
+
+
+def rss_image(item):
+    for tag in ("media:content", "media:thumbnail"):
+        node = item.find(tag, NS)
+        if node is not None and node.get("url"):
+            return node.get("url")
+    enclosure = item.find("enclosure")
+    if enclosure is not None and str(enclosure.get("type", "")).startswith("image/"):
+        return enclosure.get("url", "")
+    return ""
+
+
+def atom_link(entry):
+    for link in entry.findall(ATOM + "link"):
+        if link.get("rel", "alternate") == "alternate" and link.get("href"):
+            return link.get("href")
+    return ""
+
+
+def parse_feed(raw, host=None):
+    """Articles from an RSS 2.0 or Atom feed, optionally only those on `host`."""
     root = ET.fromstring(raw)
     items = []
     for item in root.findall("channel/item"):
-        link = (item.findtext("link") or "").strip()
-        if urllib.parse.urlparse(link).netloc != COOKING_HOST:
-            continue
-        published = ""
-        pub = item.findtext("pubDate")
-        if pub:
-            try:
-                published = email.utils.parsedate_to_datetime(pub).isoformat()
-            except (TypeError, ValueError):
-                published = ""
-        media = item.find("media:content", NS)
         items.append({
             "title": (item.findtext("title") or "").strip(),
-            "link": link,
-            "description": (item.findtext("description") or "").strip(),
-            "author": (item.findtext("dc:creator", namespaces=NS) or "").strip(),
-            "published": published,
-            "image": media.get("url", "") if media is not None else "",
+            "link": (item.findtext("link") or "").strip(),
+            "author": (item.findtext("dc:creator", namespaces=NS) or item.findtext("author") or "").strip(),
+            "published": rss_date(item.findtext("pubDate")),
+            "image": rss_image(item),
         })
-    return items
+    for entry in root.findall(ATOM + "entry"):
+        thumb = entry.find("media:thumbnail", NS)
+        items.append({
+            "title": (entry.findtext(ATOM + "title") or "").strip(),
+            "link": atom_link(entry),
+            "author": (entry.findtext(ATOM + "author/" + ATOM + "name") or "").strip(),
+            "published": iso_date(entry.findtext(ATOM + "published") or entry.findtext(ATOM + "updated")),
+            "image": thumb.get("url", "") if thumb is not None else "",
+        })
+    if host:
+        items = [i for i in items if urllib.parse.urlparse(i["link"]).netloc == host]
+    return [i for i in items if i["title"] and i["link"]]
 
 
 # -------------------------------------------------------------------- alerts
@@ -392,18 +439,21 @@ def run(args):
         score_interval = args.live_interval if needs_live_polling(prev.get("games", []), now, args.idle_interval) \
             else args.idle_interval
         scores_due = args.force or reconfigured or now - prev.get("scoresFetchedAt", 0) >= score_interval
-        news_due = args.force or not prev or now - prev.get("newsFetchedAt", 0) >= args.news_interval
+        feeds = {section: section_url(args, section) for section in SECTIONS}
+        news_due = args.force or now - prev.get("newsFetchedAt", 0) >= args.news_interval \
+            or prev.get("feeds") != feeds
         if not scores_due and not news_due:
             return 0
 
         out = dict(prev)
-        out.update(version=VERSION, config=config, errors=[])
+        out.update(version=VERSION, config=config, feeds=feeds, errors=[])
         prev_games = prev.get("games", []) if not reconfigured else []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             board_jobs = {path: pool.submit(fetch, ESPN_SCOREBOARD.format(path=path), args.fixtures)
                           for path in leagues} if scores_due else {}
-            news_job = pool.submit(fetch, NYT_FOOD_FEED, args.fixtures) if news_due else None
+            feed_jobs = {section: pool.submit(fetch, url, args.fixtures)
+                         for section, url in feeds.items()} if news_due else {}
 
             if scores_due:
                 kept = collections.defaultdict(list)
@@ -426,21 +476,27 @@ def run(args):
                 if not reconfigured:
                     send_alerts(alert_events(prev_games, games, args.alerts), args.notify_cmd)
 
-            if news_job is not None:
-                try:
-                    out["cooking"] = parse_cooking(news_job.result())
-                    out["newsFetchedAt"] = now
-                except Exception as exc:
-                    out.setdefault("cooking", [])
-                    out["errors"].append(f"NYT Cooking: {exc}")
-                    # Retry in a minute rather than on every widget tick.
-                    out["newsFetchedAt"] = now - args.news_interval + 60
+            if feed_jobs:
+                articles, failed = {}, False
+                old_articles, old_feeds = prev.get("articles", {}), prev.get("feeds", {})
+                for section, job in feed_jobs.items():
+                    try:
+                        articles[section] = parse_feed(job.result(), SECTIONS[section]["host"])
+                    except Exception as exc:  # Keep the last good articles from the same feed.
+                        failed = True
+                        same_feed = old_feeds.get(section) == feeds[section]
+                        articles[section] = old_articles.get(section, []) if same_feed else []
+                        out["errors"].append(f"{SECTIONS[section]['label']}: {exc}")
+                out["articles"] = articles
+                # After a failure, retry in a minute rather than on every widget tick.
+                out["newsFetchedAt"] = now - args.news_interval + 60 if failed else now
 
         out["live"] = any(g["state"] == "in" for g in out.get("games", []))
         out["ticker"] = {
             "scores": ticker_games(out.get("games", []), now),
             "favorites": ticker_games(out.get("games", []), now, favourites_only=True),
-            "cooking": [{"text": c["title"], "link": c["link"]} for c in out.get("cooking", [])[:5]],
+            "articles": {section: [{"text": a["title"], "link": a["link"]} for a in items[:5]]
+                         for section, items in out.get("articles", {}).items()},
         }
         out["updatedAt"] = now
         write_atomic(cache_path, out)

@@ -20,7 +20,9 @@
     "defaults": {
       "leagues": "soccer/eng.1,basketball/nba",
       "teams": "",
-      "tickerMode": "both",
+      "tickerSources": "scores,cooking",
+      "newsFeed": "",
+      "businessFeed": "",
       "tickerTeams": "favorites",
       "alerts": "favorites",
       "hourCycle": 12,
@@ -31,7 +33,9 @@
     "schema": [
       { "key": "leagues", "type": "string", "label": "Leagues", "defaultValue": "soccer/eng.1,basketball/nba", "description": "Comma-separated ESPN sport/league paths, e.g. soccer/eng.1, basketball/nba, football/nfl, hockey/nhl, baseball/mlb" },
       { "key": "teams", "type": "string", "label": "Favourite teams", "defaultValue": "", "description": "Comma-separated team abbreviations or names; favourites lead the ticker and get alerts" },
-      { "key": "tickerMode", "type": "enum", "label": "Ticker", "defaultValue": "both", "options": ["both", "scores", "cooking"] },
+      { "key": "tickerSources", "type": "multiselect", "label": "Ticker shows", "defaultValue": "scores,cooking", "options": ["scores", "news", "business", "cooking"] },
+      { "key": "newsFeed", "type": "string", "label": "News feed", "defaultValue": "", "description": "RSS or Atom URL; empty uses NYT Top Stories" },
+      { "key": "businessFeed", "type": "string", "label": "Business feed", "defaultValue": "", "description": "RSS or Atom URL; empty uses NYT Business" },
       { "key": "tickerTeams", "type": "enum", "label": "Ticker games", "defaultValue": "favorites", "options": ["favorites", "all"], "description": "Favourites only while any has a game on; otherwise all games" },
       { "key": "alerts", "type": "enum", "label": "Alerts", "defaultValue": "favorites", "options": ["off", "favorites", "all"] },
       { "key": "hourCycle", "type": "enum", "label": "Clock", "defaultValue": 12, "options": [12, 24] },

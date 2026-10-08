@@ -5,9 +5,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Sports scores and NYT Cooking for the bar: a newspaper icon plus a
-// continuously scrolling ticker, and a popup with the full scoreboard, the
-// cooking articles and the settings. All fetching happens in
+// Sports scores and news for the bar: a newspaper icon plus a continuously
+// scrolling ticker, and a popup with the full scoreboard, the News, Business
+// and NYT Cooking articles, and the settings. All fetching happens in
 // bin/av-news-fetch, which writes one cache file; this widget only runs the
 // helper on a timer and draws whatever the cache holds, so every monitor's
 // copy shows the same data and alerts fire once.
@@ -36,8 +36,12 @@ Panel {
 
   readonly property string leagues: String(setting("leagues", "soccer/eng.1,basketball/nba"))
   readonly property string teams: String(setting("teams", ""))
-  readonly property string tickerMode: String(setting("tickerMode", "both"))
+  readonly property var tickerSources: String(setting("tickerSources", "scores,cooking")).split(",")
+    .map(function(s) { return s.trim() }).filter(function(s) { return s !== "" })
   readonly property string tickerTeams: String(setting("tickerTeams", "favorites"))
+  // Empty means the helper's default (NYT Top Stories / NYT Business).
+  readonly property string newsFeed: String(setting("newsFeed", ""))
+  readonly property string businessFeed: String(setting("businessFeed", ""))
   readonly property string alerts: String(setting("alerts", "favorites"))
   readonly property int hourCycle: Number(setting("hourCycle", 12)) === 24 ? 24 : 12
   readonly property int tickerWidth: Math.max(80, Math.min(800, Number(setting("tickerWidth", 240)) || 240))
@@ -47,8 +51,10 @@ Panel {
   readonly property var settingDefaults: ({
     leagues: "soccer/eng.1,basketball/nba",
     teams: "",
-    tickerMode: "both",
+    tickerSources: "scores,cooking",
     tickerTeams: "favorites",
+    newsFeed: "",
+    businessFeed: "",
     alerts: "favorites",
     hourCycle: 12,
     tickerWidth: 240,
@@ -67,7 +73,14 @@ Panel {
   property bool forceQueued: false
 
   readonly property var games: feed && feed.games ? feed.games : []
-  readonly property var cooking: feed && feed.cooking ? feed.cooking : []
+  readonly property var articles: feed && feed.articles ? feed.articles : ({})
+
+  // Article tabs, in display and ticker order.
+  readonly property var sections: [
+    { id: "news", label: "News" },
+    { id: "business", label: "Business" },
+    { id: "cooking", label: "Cooking" }
+  ]
   readonly property var leagueList: feed && feed.leagues ? feed.leagues : []
   readonly property int liveCount: games.filter(function(g) { return g.state === "in" }).length
   readonly property bool busy: fetchProc.running
@@ -81,17 +94,19 @@ Panel {
     var out = []
     var ticker = feed && feed.ticker ? feed.ticker : null
     if (!ticker) return out
-    if (tickerMode !== "cooking") {
+    if (tickerSources.indexOf("scores") >= 0) {
       // Favourites only while any of them has a game in the ticker window;
       // otherwise every game, so the ticker never goes blank on an off day.
       var favourites = ticker.favorites || []
       out = out.concat(tickerTeams === "favorites" && favourites.length > 0 ? favourites : (ticker.scores || []))
     }
-    if (tickerMode !== "scores") {
-      out = out.concat((ticker.cooking || []).map(function(item) {
-        return { text: item.text, link: item.link, live: false, cooking: true }
+    var tickerArticles = ticker.articles || {}
+    sections.forEach(function(section) {
+      if (tickerSources.indexOf(section.id) < 0) return
+      out = out.concat((tickerArticles[section.id] || []).map(function(item) {
+        return { text: section.label + ": " + item.text, link: item.link, live: false }
       }))
-    }
+    })
     return out
   }
 
@@ -140,7 +155,9 @@ Panel {
       "--leagues", leagues,
       "--teams", teams,
       "--alerts", alerts,
-      "--hour-cycle", String(hourCycle)]
+      "--hour-cycle", String(hourCycle),
+      "--news-feed", newsFeed,
+      "--business-feed", businessFeed]
     if (force) argv.push("--force")
     fetchProc.command = argv
     fetchProc.running = true
@@ -183,7 +200,7 @@ Panel {
 
   // A settings change refetches straight away (the helper sees the new
   // configuration); debounced so typing a team list doesn't spawn a run per key.
-  readonly property string fetchKey: JSON.stringify([leagues, teams, alerts, hourCycle])
+  readonly property string fetchKey: JSON.stringify([leagues, teams, alerts, hourCycle, newsFeed, businessFeed])
   onFetchKeyChanged: fetchDebounce.restart()
 
   Timer {
@@ -261,9 +278,9 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { root.refreshNow(); return "ok" }
-    // Opens the popup on a tab: `omarchy-shell av.news tab cooking`.
+    // Opens the popup on a tab: `omarchy-shell av.news tab business`.
     function tab(name: string): string {
-      if (name !== "scores" && name !== "cooking") return "unknown tab: " + name
+      if (name !== "scores" && !root.sections.some(function(s) { return s.id === name })) return "unknown tab: " + name
       root.panelTab = name
       root.open()
       return "ok"
@@ -441,7 +458,7 @@ Panel {
 
         Text {
           textFormat: Text.PlainText
-          text: entry.modelData.cooking ? "Cooking: " + entry.modelData.text : entry.modelData.text
+          text: entry.modelData.text
           color: root.ink
           font.family: root.fontFamily
           font.pixelSize: Style.font.body

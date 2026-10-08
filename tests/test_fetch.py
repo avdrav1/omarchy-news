@@ -57,8 +57,17 @@ class FetchCase(unittest.TestCase):
             fh.write(f'#!/bin/sh\nprintf "%s|" "$@" >> {self.alerts_log}\necho >> {self.alerts_log}\n')
         os.chmod(notify, 0o755)
         self.notify = notify
-        shutil.copy(os.path.join(HERE, "fixtures", "nyt-food.xml"),
-                    os.path.join(self.fixtures, fetcher.fixture_name(fetcher.NYT_FOOD_FEED)))
+        self.put_feed(fetcher.SECTIONS["cooking"]["default"], "nyt-food.xml")
+        self.put_feed(fetcher.SECTIONS["news"]["default"], "nyt-home.xml")
+        self.put_feed(fetcher.SECTIONS["business"]["default"], "nyt-home.xml")
+
+    def put_feed(self, url, fixture=None, body=None):
+        target = os.path.join(self.fixtures, fetcher.fixture_name(url))
+        if fixture:
+            shutil.copy(os.path.join(HERE, "fixtures", fixture), target)
+        else:
+            with open(target, "w") as fh:
+                fh.write(body)
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -85,10 +94,24 @@ class FetchCase(unittest.TestCase):
             return [line.split("|")[4] for line in fh.read().splitlines() if line]
 
 
-class CookingTests(FetchCase):
-    def test_keeps_only_nyt_cooking_articles(self):
+ATOM_FEED = """<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Markets</title>
+  <entry>
+    <title>Stocks close higher</title>
+    <link rel="alternate" href="https://markets.test/stocks"/>
+    <author><name>Pat Lee</name></author>
+    <updated>2026-10-10T09:30:00Z</updated>
+    <media:thumbnail url="https://markets.test/stocks.jpg"/>
+  </entry>
+</feed>
+"""
+
+
+class ArticleTests(FetchCase):
+    def test_cooking_keeps_only_nyt_cooking_articles(self):
         self.serve(EPL, board("EPL"))
-        cooking = self.run_fetch()["cooking"]
+        cooking = self.run_fetch()["articles"]["cooking"]
         self.assertEqual(len(cooking), 2)
         for item in cooking:
             self.assertTrue(item["link"].startswith("https://cooking.nytimes.com/"))
@@ -96,6 +119,35 @@ class CookingTests(FetchCase):
             self.assertTrue(item["author"])
             self.assertTrue(item["image"].startswith("https://"))
             self.assertIsNotNone(dt.datetime.fromisoformat(item["published"]).tzinfo)
+
+    def test_news_and_business_default_to_nyt_feeds_unfiltered(self):
+        self.serve(EPL, board("EPL"))
+        feed = self.run_fetch()
+        self.assertEqual([len(feed["articles"][s]) for s in ("news", "business")], [2, 2])
+        self.assertEqual(len(feed["ticker"]["articles"]["news"]), 2)
+
+    def test_custom_atom_feed_is_fetched_as_soon_as_it_is_configured(self):
+        self.serve(EPL, board("EPL"))
+        self.run_fetch()
+        self.put_feed("https://markets.test/atom", body=ATOM_FEED)
+        feed = self.run_fetch(now=NOW + 10, extra=("--business-feed", "https://markets.test/atom"))
+        self.assertEqual(feed["articles"]["business"], [{
+            "title": "Stocks close higher",
+            "link": "https://markets.test/stocks",
+            "author": "Pat Lee",
+            "published": "2026-10-10T09:30:00+00:00",
+            "image": "https://markets.test/stocks.jpg",
+        }])
+
+    def test_failed_feed_keeps_its_articles_but_a_new_broken_feed_does_not(self):
+        self.serve(EPL, board("EPL"))
+        self.run_fetch()
+        self.put_feed(fetcher.SECTIONS["news"]["default"], body="<not xml")
+        feed = self.run_fetch(now=NOW + 1000)
+        self.assertEqual(len(feed["articles"]["news"]), 2)
+        self.assertTrue(any(e.startswith("News:") for e in feed["errors"]))
+        feed = self.run_fetch(now=NOW + 1100, extra=("--news-feed", "https://missing.test/rss"))
+        self.assertEqual(feed["articles"]["news"], [])
 
 
 class AlertTests(FetchCase):

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nyt="http://www.nytimes.com/namespaces/rss/2.0" version="2.0">
+  <channel>
+    <title>NYT &gt; Top Stories</title>
+    <link>https://www.nytimes.com</link>
+    <atom:link href="https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" rel="self" type="application/rss+xml"></atom:link>
+    <description></description>
+    <language>en-us</language>
+    <copyright>Copyright 2026 The New York Times Company</copyright>
+    <lastBuildDate>Thu, 08 Oct 2026 00:30:19 +0000</lastBuildDate>
+    <pubDate>Thu, 08 Oct 2026 00:09:34 +0000</pubDate>
+    <image>
+      <title>NYT &gt; Top Stories</title>
+      <url>https://static01.nyt.com/images/misc/NYT_logo_rss_250x40.png</url>
+      <link>https://www.nytimes.com</link>
+    </image>
+    <item>
+      <title>From Iran to the U.K., Trump Is Being Forced Into Retreat</title>
+      <link>https://www.nytimes.com/2026/10/07/us/politics/trump-iran-retreat.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/07/us/politics/trump-iran-retreat.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/07/us/politics/trump-iran-retreat.html" rel="standout"></atom:link>
+      <description>A war that was intended to demonstrate the reach of American power has now done the opposite. It is a lesson in unintended consequences.</description>
+      <dc:creator>David E. Sanger and Eric Schmitt</dc:creator>
+      <pubDate>Wed, 07 Oct 2026 17:55:53 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">US and Israeli Attack on Iran (2026)</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">United States Defense and Military Forces</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">Defense Department</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">Central Intelligence Agency</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">United States Air Force</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_org">United States Central Command</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Hegseth, Pete</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Trump, Donald J</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Persian Gulf</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Iran</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Royal Air Force Fairford (Gloucestershire, England, Air Base)</category>
+      <media:content height="1696" medium="image" url="https://static01.nyt.com/images/2026/10/07/multimedia/07dc-prexy-retreat-jkvw/07dc-prexy-retreat-jkvw-mediumSquareAt3X.jpg" width="1697"></media:content>
+      <media:credit>@Craigyoungmedia, via Reuters</media:credit>
+      <media:description>The R.A.F. Fairford air base, from which a dozen American B-1 bombers were withdrawn last weekend, has been a mainstay of U.S.-British military cooperation since it opened in 1944. </media:description>
+    </item><item>
+      <title>Rubio Urges Europe to Awaken From ‘Slumber’ and Uphold Western Dominance</title>
+      <link>https://www.nytimes.com/2026/10/07/world/europe/rubio-greece-defense-immigration.html</link>
+      <guid isPermaLink="true">https://www.nytimes.com/2026/10/07/world/europe/rubio-greece-defense-immigration.html</guid>
+      <atom:link href="https://www.nytimes.com/2026/10/07/world/europe/rubio-greece-defense-immigration.html" rel="standout"></atom:link>
+      <description>In Greece, Secretary of State Marco Rubio said Western nations must embrace an earlier ethos of exploration and conquest as part of their civilization, to remain ‘at the head of the world.’</description>
+      <dc:creator>Edward Wong</dc:creator>
+      <pubDate>Wed, 07 Oct 2026 19:54:57 +0000</pubDate>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">United States Politics and Government</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Politics and Government</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/des">Defense and Military Forces</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Guilfoyle, Kimberly</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Rubio, Marco</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_per">Trump, Donald J</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Athens (Greece)</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Europe</category>
+      <category domain="http://www.nytimes.com/namespaces/keywords/nyt_geo">Greece</category>
+      <media:content height="1800" medium="image" url="https://static01.nyt.com/images/2026/10/07/multimedia/07greece-rubio-lcvk/07greece-rubio-lcvk-mediumSquareAt3X.jpg" width="1800"></media:content>
+      <media:credit>Milos Bicanski/Getty Images</media:credit>
+      <media:description>Secretary of State Marco Rubio, left, and Foreign Minister Giorgos Gerapetritis of Greece after a meeting in Athens on Wednesday.</media:description>
+    </item>
+  </channel>
+</rss>

@@ -2,11 +2,12 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// The popup: today's scoreboard per league, the NYT Cooking articles, and the
-// settings form. It is a KeyboardPanel on purpose: Shibumi recognises that
-// shape on hosted widgets and re-skins it with its own panel tokens and caret.
+// The popup: today's scoreboard per league, the News, Business and NYT
+// Cooking articles, and the settings form. It is a KeyboardPanel on purpose:
+// Shibumi recognises that shape on hosted widgets and re-skins it with its
+// own panel tokens and caret.
 //
-// Keys: h/l or 1/2 switch tabs, j/k move, Enter opens, r refreshes,
+// Keys: h/l or 1-4 switch tabs, j/k move, Enter opens, r refreshes,
 // s toggles settings, Tab moves to the next bar popup, Esc closes.
 KeyboardPanel {
   id: panel
@@ -29,15 +30,25 @@ KeyboardPanel {
   readonly property string tab: widget.panelTab
   property int cursor: -1
 
-  // The rows the cursor walks: games in league order, or cooking articles.
+  readonly property var tabIds: ["scores"].concat(widget.sections.map(function(s) { return s.id }))
+  readonly property var tabOptions: [{ value: "scores", label: "Scores" }].concat(
+    widget.sections.map(function(s) { return { value: s.id, label: s.label } }))
+  readonly property var tabArticles: tab === "scores" ? [] : (widget.articles[tab] || [])
+
+  // The rows the cursor walks: games in league order, or the tab's articles.
   readonly property var rows: {
-    if (tab === "cooking") return panel.widget.cooking
+    if (tab !== "scores") return tabArticles
     var out = []
     var leagues = panel.widget.leagueList
     for (var i = 0; i < leagues.length; i++) {
       out = out.concat(panel.widget.games.filter(function(g) { return g.league === leagues[i].id }))
     }
     return out
+  }
+
+  function stepTab(direction) {
+    var i = tabIds.indexOf(tab)
+    panel.widget.panelTab = tabIds[(i + direction + tabIds.length) % tabIds.length]
   }
 
   onOpenChanged: if (open) {
@@ -97,15 +108,15 @@ KeyboardPanel {
     onTabRequested: function(direction) { panel.widget.switchPanel(direction) }
     onMoveRequested: function(dx, dy) {
       if (panel.widget.settingsOpen) return
-      if (dx !== 0) panel.widget.panelTab = dx > 0 ? "cooking" : "scores"
+      if (dx !== 0) panel.stepTab(dx > 0 ? 1 : -1)
       else panel.moveCursor(dy)
     }
     onActivateRequested: if (!panel.widget.settingsOpen && panel.cursor >= 0) panel.activate(panel.cursor)
     onTextKey: function(text) {
       if (text === "r") panel.widget.refreshNow()
       else if (text === "s") panel.toggleSettings()
-      else if (text === "1" && !panel.widget.settingsOpen) panel.widget.panelTab = "scores"
-      else if (text === "2" && !panel.widget.settingsOpen) panel.widget.panelTab = "cooking"
+      else if (!panel.widget.settingsOpen && text >= "1" && text <= String(panel.tabIds.length))
+        panel.widget.panelTab = panel.tabIds[parseInt(text, 10) - 1]
     }
 
     Flickable {
@@ -173,10 +184,7 @@ KeyboardPanel {
 
         ButtonGroup {
           visible: !panel.widget.settingsOpen
-          options: [
-            { value: "scores", label: "Scores" },
-            { value: "cooking", label: "Cooking" }
-          ]
+          options: panel.tabOptions
           value: panel.tab
           foreground: panel.foreground
           fontFamily: panel.fontFamily
@@ -250,17 +258,17 @@ KeyboardPanel {
           }
         }
 
-        // ----------------------------------------------------------- cooking
+        // ---------------------------------------------------------- articles
 
         Column {
-          visible: !panel.widget.settingsOpen && panel.tab === "cooking"
+          visible: !panel.widget.settingsOpen && panel.tab !== "scores"
           width: parent.width
           spacing: Style.space(4)
 
           Repeater {
-            model: panel.tab === "cooking" ? panel.widget.cooking : []
+            model: panel.tabArticles
 
-            CookingRow {
+            ArticleRow {
               required property var modelData
               required property int index
               width: parent.width
@@ -270,9 +278,9 @@ KeyboardPanel {
           }
 
           Text {
-            visible: panel.widget.cooking.length === 0
+            visible: panel.tabArticles.length === 0
             textFormat: Text.PlainText
-            text: panel.widget.feed ? "No NYT Cooking articles in the feed" : "Loading…"
+            text: panel.widget.feed ? "No articles in this feed" : "Loading…"
             color: panel.dim
             font.family: panel.fontFamily
             font.pixelSize: Style.font.body
@@ -358,39 +366,42 @@ KeyboardPanel {
     }
   }
 
-  component CookingRow: RowSurface {
-    id: cookingRow
+  // Thumbnail (when the feed has one), title and "author · age".
+  component ArticleRow: RowSurface {
+    id: articleRow
     property var article: null
-    readonly property real thumb: Style.space(56)
+    readonly property bool hasImage: !!(article && article.image)
+    readonly property real thumb: hasImage ? Style.space(56) : 0
 
     link: article ? article.link : ""
-    implicitHeight: Math.max(thumb, cookingText.implicitHeight) + Style.space(10)
+    implicitHeight: Math.max(thumb, articleText.implicitHeight) + Style.space(10)
 
     Rectangle {
       id: thumbFrame
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: cookingRow.thumb
-      height: cookingRow.thumb
+      visible: articleRow.hasImage
+      width: articleRow.thumb
+      height: articleRow.thumb
       radius: Style.cornerRadius
       color: panel.hoverFill
       clip: true
 
       Image {
         anchors.fill: parent
-        source: cookingRow.article && cookingRow.article.image ? cookingRow.article.image : ""
+        source: articleRow.hasImage ? articleRow.article.image : ""
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
-        sourceSize.width: cookingRow.thumb * 2
-        sourceSize.height: cookingRow.thumb * 2
+        sourceSize.width: Style.space(112)
+        sourceSize.height: Style.space(112)
       }
     }
 
     Column {
-      id: cookingText
+      id: articleText
       anchors.left: thumbFrame.right
-      anchors.leftMargin: Style.space(10)
+      anchors.leftMargin: articleRow.hasImage ? Style.space(10) : 0
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(3)
@@ -398,7 +409,7 @@ KeyboardPanel {
       Text {
         width: parent.width
         textFormat: Text.PlainText
-        text: cookingRow.article ? cookingRow.article.title : ""
+        text: articleRow.article ? articleRow.article.title : ""
         color: panel.foreground
         font.family: panel.fontFamily
         font.pixelSize: Style.font.body
@@ -412,7 +423,7 @@ KeyboardPanel {
         width: parent.width
         textFormat: Text.PlainText
         text: {
-          var a = cookingRow.article
+          var a = articleRow.article
           if (!a) return ""
           var parts = []
           if (a.author) parts.push(a.author)
@@ -432,6 +443,7 @@ KeyboardPanel {
   component SettingsView: Column {
     id: view
     readonly property bool editing: leaguesRow.editing || teamsRow.editing
+      || newsFeedRow.editing || businessFeedRow.editing
 
     spacing: Style.space(12)
 
@@ -483,21 +495,77 @@ KeyboardPanel {
     }
 
     PanelSectionHeader {
+      text: "Feeds"
+      foreground: panel.foreground
+      fontFamily: panel.fontFamily
+    }
+
+    TextRow {
+      id: newsFeedRow
+      width: parent.width
+      label: "News feed (RSS or Atom URL; empty uses NYT Top Stories)"
+      placeholder: "NYT Top Stories"
+      current: panel.widget.newsFeed
+      onCommitted: function(v) { panel.widget.saveSetting("newsFeed", v.trim()) }
+    }
+
+    TextRow {
+      id: businessFeedRow
+      width: parent.width
+      label: "Business feed (RSS or Atom URL; empty uses NYT Business)"
+      placeholder: "NYT Business"
+      current: panel.widget.businessFeed
+      onCommitted: function(v) { panel.widget.saveSetting("businessFeed", v.trim()) }
+    }
+
+    PanelSectionHeader {
       text: "Ticker"
       foreground: panel.foreground
       fontFamily: panel.fontFamily
     }
 
-    ChoiceRow {
+    // Any mix of sources; saved in tab order so the ticker order is stable.
+    Item {
       width: parent.width
-      label: "Shows"
-      options: [
-        { value: "both", label: "Both" },
-        { value: "scores", label: "Scores" },
-        { value: "cooking", label: "Cooking" }
-      ]
-      value: panel.widget.tickerMode
-      onChanged: function(v) { panel.widget.saveSetting("tickerMode", v) }
+      implicitHeight: Math.max(sourcesLabel.implicitHeight, sourcesRow.implicitHeight)
+
+      Text {
+        id: sourcesLabel
+        textFormat: Text.PlainText
+        text: "Shows"
+        color: panel.foreground
+        font.family: panel.fontFamily
+        font.pixelSize: Style.font.body
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Row {
+        id: sourcesRow
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.spacing.md
+
+        Repeater {
+          model: panel.tabOptions
+
+          Button {
+            required property var modelData
+            readonly property bool on: panel.widget.tickerSources.indexOf(modelData.value) >= 0
+            text: modelData.label
+            bordered: true
+            selected: on
+            foreground: panel.foreground
+            fontFamily: panel.fontFamily
+            onClicked: {
+              var id = modelData.value
+              var current = panel.widget.tickerSources
+              var next = panel.tabIds.filter(function(t) { return t === id ? !current.includes(t) : current.includes(t) })
+              panel.widget.saveSetting("tickerSources", next.join(","))
+            }
+          }
+        }
+      }
     }
 
     ChoiceRow {
