@@ -6,7 +6,7 @@ import qs.Commons
 import qs.Ui
 
 // Sports scores and news for the bar: a newspaper icon plus a continuously
-// scrolling ticker, and a popup with the full scoreboard, up to four
+// scrolling ticker, and a popup with the full scoreboard, up to five
 // configurable article tabs, and the settings. All fetching happens in
 // bin/av-news-fetch, which writes one cache file; this widget only runs the
 // helper on a timer and draws whatever the cache holds, so every monitor's
@@ -58,10 +58,12 @@ Panel {
     tab2: "business",
     tab3: "technology",
     tab4: "science",
+    tab5: "world",
     tab1Url: "",
     tab2Url: "",
     tab3Url: "",
     tab4Url: "",
+    tab5Url: "",
     alerts: "favorites",
     hourCycle: 12,
     tickerWidth: 240,
@@ -100,8 +102,8 @@ Panel {
   readonly property var slotOptions: presets.map(function(p) { return { value: p.id, label: p.name } })
     .concat([{ value: "custom", label: "Custom RSS/Atom URL" }, { value: "off", label: "Off" }])
 
-  // The four article-tab settings as configured, including ones that are off.
-  readonly property var slots: [1, 2, 3, 4].map(function(n) {
+  // The five article-tab settings as configured, including ones that are off.
+  readonly property var slots: [1, 2, 3, 4, 5].map(function(n) {
     var id = "tab" + n
     return {
       id: id,

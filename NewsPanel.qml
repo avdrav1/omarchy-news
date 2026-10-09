@@ -7,7 +7,7 @@ import qs.Ui
 // Shibumi recognises that shape on hosted widgets and re-skins it with its
 // own panel tokens and caret.
 //
-// Keys: h/l or 1-5 switch tabs, j/k move, Enter opens, r refreshes,
+// Keys: h/l or 1-6 switch tabs, j/k move, Enter opens, r refreshes,
 // s toggles settings, Tab moves to the next bar popup, Esc closes.
 KeyboardPanel {
   id: panel
@@ -17,7 +17,10 @@ KeyboardPanel {
   owner: panel.widget
   open: panel.widget.opened
   focusTarget: keyCatcher
-  contentWidth: panel.fittedContentWidth(Style.space(420))
+  // Wider than the default only when long tab labels need it. contentWidth is
+  // the card's outer width; the card's padding and border are symmetric, so
+  // the vertical inset stands in for the horizontal one.
+  contentWidth: panel.fittedContentWidth(Math.max(Style.space(420), tabBar.implicitWidth + panel.verticalContentInset))
   contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(620))
 
   readonly property color foreground: panel.widget.foreground
@@ -184,11 +187,14 @@ KeyboardPanel {
         }
 
         ButtonGroup {
+          id: tabBar
           visible: !panel.widget.settingsOpen && panel.tabIds.length > 0
           options: panel.tabOptions
           value: panel.tab
           foreground: panel.foreground
           fontFamily: panel.fontFamily
+          // Six chips don't fit the popup at body size.
+          fontSize: panel.tabIds.length > 5 ? Style.font.caption : Style.font.body
           focusable: false
           onChanged: function(v) { panel.widget.panelTab = v }
         }
@@ -447,7 +453,7 @@ KeyboardPanel {
   component SettingsView: Column {
     id: view
     readonly property bool editing: leaguesRow.editing || teamsRow.editing
-      || slot1Row.editing || slot2Row.editing || slot3Row.editing || slot4Row.editing
+      || slot1Row.editing || slot2Row.editing || slot3Row.editing || slot4Row.editing || slot5Row.editing
       || sourcesSelect.popupOpen
 
     spacing: Style.space(12)
@@ -524,6 +530,7 @@ KeyboardPanel {
     SlotRow { id: slot2Row; index: 1; width: parent.width }
     SlotRow { id: slot3Row; index: 2; width: parent.width }
     SlotRow { id: slot4Row; index: 3; width: parent.width }
+    SlotRow { id: slot5Row; index: 4; width: parent.width }
 
     PanelSectionHeader {
       text: "Ticker"
@@ -543,7 +550,7 @@ KeyboardPanel {
       fontFamily: panel.fontFamily
       onChanged: function(vals) {
         var current = panel.widget.tickerSources
-        panel.widget.saveSetting("tickerSources", ["scores", "tab1", "tab2", "tab3", "tab4"].filter(function(t) {
+        panel.widget.saveSetting("tickerSources", ["scores", "tab1", "tab2", "tab3", "tab4", "tab5"].filter(function(t) {
           return panel.tabIds.indexOf(t) >= 0 ? vals.indexOf(t) >= 0 : current.indexOf(t) >= 0
         }).join(","))
       }

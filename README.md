@@ -2,7 +2,7 @@
 
 An Omarchy shell bar widget, built to sit in the Shibumi bar: a newspaper icon
 and a scrolling ticker of live sports scores (ESPN) and headlines, with a popup
-holding the full scoreboard, up to four article tabs, and settings.
+holding the full scoreboard, up to five article tabs, and settings.
 
 No API keys. Scores come from ESPN's public scoreboard JSON. Each article tab
 shows an NYT section (News/Top Stories, Business, Technology, Science, World,
@@ -31,13 +31,13 @@ Requires an Omarchy release with `omarchy plugin add` and `python3` on the `PATH
 | Middle click on the ticker | Open the game or article under the pointer |
 | Hover | Pause the ticker; tooltip lists live games |
 
-In the popup: `h`/`l` or `1`–`5` switch Scores and the article tabs,
+In the popup: `h`/`l` or `1`–`6` switch Scores and the article tabs,
 `j`/`k` move, `Enter` opens, `r` refreshes, `s` toggles settings, `Tab` moves to
 the next bar popup, `Esc` closes.
 
 IPC: `omarchy-shell av.news toggle|open|close|refresh|settings|text`, and
 `omarchy-shell av.news tab <name>` to open on a tab, e.g. for Hyprland key bindings.
-`<name>` is `scores`, a slot (`tab1`–`tab4`) or a category shown by a slot (`technology`, `custom`, …).
+`<name>` is `scores`, a slot (`tab1`–`tab5`) or a category shown by a slot (`technology`, `custom`, …).
 
 ## Settings
 
@@ -49,9 +49,9 @@ Edited from the popup's settings page, or inline on the widget's entry in
 | `showScores` | `true` | `false` hides the Scores tab and the ticker's games, and stops score fetches and alerts. From the CLI pass `--json` so it is stored as a boolean: `omarchy bar set av.news showScores false --json` |
 | `leagues` | `soccer/eng.1,basketball/nba` | ESPN `sport/league` paths, e.g. `football/nfl`, `hockey/nhl`, `baseball/mlb`, `soccer/uefa.champions` |
 | `teams` | `""` | Favourite team abbreviations or names; they lead the ticker and drive alerts |
-| `tickerSources` | `scores,tab1` | Any of `scores`, `tab1`–`tab4`, comma-separated; none (or only tabs that are off) hides the ticker, leaving the icon |
-| `tab1`–`tab4` | `news`, `business`, `technology`, `science` | Article tab content: `news`, `business`, `technology`, `science`, `world`, `politics`, `health`, `climate`, `arts` (NYT sections), `omarchy` ([Omarchy News](https://omarchy.org/news/rss.xml)), `custom`, or `off` |
-| `tab1Url`–`tab4Url` | `""` | RSS or Atom URL for a `custom` tab; the tab is labelled with the feed's own title |
+| `tickerSources` | `scores,tab1` | Any of `scores`, `tab1`–`tab5`, comma-separated; none (or only tabs that are off) hides the ticker, leaving the icon |
+| `tab1`–`tab5` | `news`, `business`, `technology`, `science`, `world` | Article tab content: `news`, `business`, `technology`, `science`, `world`, `politics`, `health`, `climate`, `arts` (NYT sections), `omarchy` ([Omarchy News](https://omarchy.org/news/rss.xml)), `custom`, or `off` |
+| `tab1Url`–`tab5Url` | `""` | RSS or Atom URL for a `custom` tab; the tab is labelled with the feed's own title |
 | `tickerTeams` | `favorites` | `favorites` shows only your teams' games while any is on (live, final in the last 12 h, or within 7 days); otherwise all games. `all` always shows every game |
 | `alerts` | `favorites` | `off`, `favorites` or `all` |
 | `hourCycle` | `12` | `12` or `24` for kickoff times |
