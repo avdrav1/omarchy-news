@@ -2,12 +2,12 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// The popup: today's scoreboard per league, the News, Business and NYT
-// Cooking articles, and the settings form. It is a KeyboardPanel on purpose:
+// The popup: today's scoreboard per league, the article tabs, and the
+// settings form. It is a KeyboardPanel on purpose:
 // Shibumi recognises that shape on hosted widgets and re-skins it with its
 // own panel tokens and caret.
 //
-// Keys: h/l or 1-4 switch tabs, j/k move, Enter opens, r refreshes,
+// Keys: h/l or 1-5 switch tabs, j/k move, Enter opens, r refreshes,
 // s toggles settings, Tab moves to the next bar popup, Esc closes.
 KeyboardPanel {
   id: panel
@@ -443,7 +443,8 @@ KeyboardPanel {
   component SettingsView: Column {
     id: view
     readonly property bool editing: leaguesRow.editing || teamsRow.editing
-      || newsFeedRow.editing || businessFeedRow.editing
+      || slot1Row.editing || slot2Row.editing || slot3Row.editing || slot4Row.editing
+      || sourcesSelect.popupOpen
 
     spacing: Style.space(12)
 
@@ -495,28 +496,15 @@ KeyboardPanel {
     }
 
     PanelSectionHeader {
-      text: "Feeds"
+      text: "Tabs"
       foreground: panel.foreground
       fontFamily: panel.fontFamily
     }
 
-    TextRow {
-      id: newsFeedRow
-      width: parent.width
-      label: "News feed (RSS or Atom URL; empty uses NYT Top Stories)"
-      placeholder: "NYT Top Stories"
-      current: panel.widget.newsFeed
-      onCommitted: function(v) { panel.widget.saveSetting("newsFeed", v.trim()) }
-    }
-
-    TextRow {
-      id: businessFeedRow
-      width: parent.width
-      label: "Business feed (RSS or Atom URL; empty uses NYT Business)"
-      placeholder: "NYT Business"
-      current: panel.widget.businessFeed
-      onCommitted: function(v) { panel.widget.saveSetting("businessFeed", v.trim()) }
-    }
+    SlotRow { id: slot1Row; index: 0; width: parent.width }
+    SlotRow { id: slot2Row; index: 1; width: parent.width }
+    SlotRow { id: slot3Row; index: 2; width: parent.width }
+    SlotRow { id: slot4Row; index: 3; width: parent.width }
 
     PanelSectionHeader {
       text: "Ticker"
@@ -525,46 +513,16 @@ KeyboardPanel {
     }
 
     // Any mix of sources; saved in tab order so the ticker order is stable.
-    Item {
+    MultiSelect {
+      id: sourcesSelect
       width: parent.width
-      implicitHeight: Math.max(sourcesLabel.implicitHeight, sourcesRow.implicitHeight)
-
-      Text {
-        id: sourcesLabel
-        textFormat: Text.PlainText
-        text: "Shows"
-        color: panel.foreground
-        font.family: panel.fontFamily
-        font.pixelSize: Style.font.body
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Row {
-        id: sourcesRow
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: Style.spacing.md
-
-        Repeater {
-          model: panel.tabOptions
-
-          Button {
-            required property var modelData
-            readonly property bool on: panel.widget.tickerSources.indexOf(modelData.value) >= 0
-            text: modelData.label
-            bordered: true
-            selected: on
-            foreground: panel.foreground
-            fontFamily: panel.fontFamily
-            onClicked: {
-              var id = modelData.value
-              var current = panel.widget.tickerSources
-              var next = panel.tabIds.filter(function(t) { return t === id ? !current.includes(t) : current.includes(t) })
-              panel.widget.saveSetting("tickerSources", next.join(","))
-            }
-          }
-        }
+      label: "Ticker shows"
+      values: panel.widget.tickerSources
+      options: panel.tabOptions
+      foreground: panel.foreground
+      fontFamily: panel.fontFamily
+      onChanged: function(vals) {
+        panel.widget.saveSetting("tickerSources", panel.tabIds.filter(function(t) { return vals.indexOf(t) >= 0 }).join(","))
       }
     }
 
@@ -667,6 +625,37 @@ KeyboardPanel {
       fontFamily: panel.fontFamily
       focusable: false
       onChanged: function(v) { choiceRow.changed(v) }
+    }
+  }
+
+  // One article tab: an NYT category, a custom feed URL, or off.
+  component SlotRow: Column {
+    id: slotRow
+    property int index
+    readonly property var slot: panel.widget.slots[index]
+    readonly property bool editing: picker.popupOpen || urlRow.editing
+
+    spacing: Style.space(6)
+
+    Dropdown {
+      id: picker
+      width: parent.width
+      label: "Article tab " + (slotRow.index + 1)
+      value: slotRow.slot.category
+      options: panel.widget.slotOptions
+      foreground: panel.foreground
+      fontFamily: panel.fontFamily
+      onChanged: function(v) { panel.widget.saveSetting(slotRow.slot.id, v) }
+    }
+
+    TextRow {
+      id: urlRow
+      visible: slotRow.slot.category === "custom"
+      width: parent.width
+      label: "Feed URL (RSS or Atom)"
+      placeholder: "https://…"
+      current: slotRow.slot.url
+      onCommitted: function(v) { panel.widget.saveSetting(slotRow.slot.id + "Url", v.trim()) }
     }
   }
 

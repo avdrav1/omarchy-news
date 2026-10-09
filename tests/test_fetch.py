@@ -1,7 +1,9 @@
 """Tests for bin/av-news-fetch. Run with: python3 -m unittest discover tests"""
 
+import contextlib
 import datetime as dt
 import fcntl
+import io
 import importlib.machinery
 import importlib.util
 import json
@@ -22,6 +24,8 @@ EPL = "soccer/eng.1"
 NBA = "basketball/nba"
 NFL = "football/nfl"
 MLB = "baseball/mlb"
+NEWS = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+BUSINESS = "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
 
 
 def iso(hours_from_now):
@@ -57,9 +61,8 @@ class FetchCase(unittest.TestCase):
             fh.write(f'#!/bin/sh\nprintf "%s|" "$@" >> {self.alerts_log}\necho >> {self.alerts_log}\n')
         os.chmod(notify, 0o755)
         self.notify = notify
-        self.put_feed(fetcher.SECTIONS["cooking"]["default"], "nyt-food.xml")
-        self.put_feed(fetcher.SECTIONS["news"]["default"], "nyt-home.xml")
-        self.put_feed(fetcher.SECTIONS["business"]["default"], "nyt-home.xml")
+        self.put_feed(NEWS, "nyt-home.xml")
+        self.put_feed(BUSINESS, "nyt-home.xml")
 
     def put_feed(self, url, fixture=None, body=None):
         target = os.path.join(self.fixtures, fetcher.fixture_name(url))
@@ -77,9 +80,13 @@ class FetchCase(unittest.TestCase):
         with open(os.path.join(self.fixtures, name), "w") as fh:
             fh.write(body)
 
-    def run_fetch(self, now=NOW, leagues=EPL, teams="ARS", alerts="favorites", extra=()):
+    def run_fetch(self, now=NOW, leagues=EPL, teams="ARS", alerts="favorites", feeds=None, extra=()):
+        if feeds is None:
+            feeds = {"tab1": NEWS, "tab2": BUSINESS}
         argv = ["--cache-dir", self.cache, "--fixtures", self.fixtures, "--leagues", leagues,
                 "--teams", teams, "--alerts", alerts, "--notify-cmd", self.notify, "--now", str(now), *extra]
+        for slot, url in feeds.items():
+            argv += ["--feed", f"{slot}={url}"]
         self.assertEqual(fetcher.main(argv), 0)
         return self.feed()
 
@@ -109,45 +116,52 @@ ATOM_FEED = """<?xml version="1.0" encoding="utf-8"?>
 
 
 class ArticleTests(FetchCase):
-    def test_cooking_keeps_only_nyt_cooking_articles(self):
+    def test_rss_items_carry_title_link_author_image_and_date(self):
         self.serve(EPL, board("EPL"))
-        cooking = self.run_fetch()["articles"]["cooking"]
-        self.assertEqual(len(cooking), 2)
-        for item in cooking:
-            self.assertTrue(item["link"].startswith("https://cooking.nytimes.com/"))
+        feed = self.run_fetch()
+        self.assertEqual(feed["titles"]["tab1"], "NYT > Top Stories")
+        news = feed["articles"]["tab1"]
+        self.assertEqual(len(news), 2)
+        for item in news:
+            self.assertTrue(item["link"].startswith("https://www.nytimes.com/"))
             self.assertTrue(item["title"])
             self.assertTrue(item["author"])
             self.assertTrue(item["image"].startswith("https://"))
             self.assertIsNotNone(dt.datetime.fromisoformat(item["published"]).tzinfo)
 
-    def test_news_and_business_default_to_nyt_feeds_unfiltered(self):
+    def test_every_configured_slot_is_fetched(self):
         self.serve(EPL, board("EPL"))
         feed = self.run_fetch()
-        self.assertEqual([len(feed["articles"][s]) for s in ("news", "business")], [2, 2])
-        self.assertEqual(len(feed["ticker"]["articles"]["news"]), 2)
+        self.assertEqual([len(feed["articles"][s]) for s in ("tab1", "tab2")], [2, 2])
+        self.assertEqual(len(feed["ticker"]["articles"]["tab1"]), 2)
 
     def test_custom_atom_feed_is_fetched_as_soon_as_it_is_configured(self):
         self.serve(EPL, board("EPL"))
         self.run_fetch()
         self.put_feed("https://markets.test/atom", body=ATOM_FEED)
-        feed = self.run_fetch(now=NOW + 10, extra=("--business-feed", "https://markets.test/atom"))
-        self.assertEqual(feed["articles"]["business"], [{
+        feed = self.run_fetch(now=NOW + 10, feeds={"tab1": NEWS, "tab2": "https://markets.test/atom"})
+        self.assertEqual(feed["articles"]["tab2"], [{
             "title": "Stocks close higher",
             "link": "https://markets.test/stocks",
             "author": "Pat Lee",
             "published": "2026-10-10T09:30:00+00:00",
             "image": "https://markets.test/stocks.jpg",
         }])
+        self.assertEqual(feed["titles"]["tab2"], "Markets")
 
     def test_failed_feed_keeps_its_articles_but_a_new_broken_feed_does_not(self):
         self.serve(EPL, board("EPL"))
         self.run_fetch()
-        self.put_feed(fetcher.SECTIONS["news"]["default"], body="<not xml")
+        self.put_feed(NEWS, body="<not xml")
         feed = self.run_fetch(now=NOW + 1000)
-        self.assertEqual(len(feed["articles"]["news"]), 2)
-        self.assertTrue(any(e.startswith("News:") for e in feed["errors"]))
-        feed = self.run_fetch(now=NOW + 1100, extra=("--news-feed", "https://missing.test/rss"))
-        self.assertEqual(feed["articles"]["news"], [])
+        self.assertEqual(len(feed["articles"]["tab1"]), 2)
+        self.assertTrue(any(e.startswith("rss.nytimes.com:") for e in feed["errors"]))
+        feed = self.run_fetch(now=NOW + 1100, feeds={"tab1": "https://missing.test/rss", "tab2": BUSINESS})
+        self.assertEqual(feed["articles"]["tab1"], [])
+
+    def test_feed_argument_requires_id_and_url(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            fetcher.parse_args(["--feed", "nourl"])
 
 
 class AlertTests(FetchCase):

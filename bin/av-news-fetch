@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch sports scores (ESPN) and news feeds (NYT by default) into one cache file.
+"""Fetch sports scores (ESPN) and the news feeds given with --feed into one cache file.
 
 The bar widget runs this every few seconds from every monitor. Only one copy
 does any work at a time (flock), and it only touches the network when the
@@ -31,18 +31,7 @@ import xml.etree.ElementTree as ET
 
 VERSION = 2
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard"
-NYT_FEED = "https://rss.nytimes.com/services/xml/rss/nyt/{section}.xml"
 USER_AGENT = "av.news/1 (+omarchy shell plugin)"
-
-# Article sections in display order. News and business read any RSS or Atom
-# feed the user configures; cooking is NYT Cooking, which has no feed of its
-# own and comes out of the NYT Food feed by link host.
-SECTIONS = {
-    "news": {"label": "News", "default": NYT_FEED.format(section="HomePage"), "host": None},
-    "business": {"label": "Business", "default": NYT_FEED.format(section="Business"), "host": None},
-    "cooking": {"label": "NYT Cooking", "default": NYT_FEED.format(section="DiningandWine"),
-                "host": "cooking.nytimes.com"},
-}
 
 # ESPN's league abbreviation is sometimes the full name ("Premier League").
 SHORT_LEAGUE_NAMES = {
@@ -73,8 +62,8 @@ def parse_args(argv):
     p.add_argument("--live-interval", type=int, default=30, help="seconds")
     p.add_argument("--idle-interval", type=int, default=300, help="seconds")
     p.add_argument("--news-interval", type=int, default=900, help="seconds")
-    p.add_argument("--news-feed", default="", help="RSS/Atom URL for the News tab (empty: NYT Top Stories)")
-    p.add_argument("--business-feed", default="", help="RSS/Atom URL for the Business tab (empty: NYT Business)")
+    p.add_argument("--feed", action="append", default=[], type=feed_arg, metavar="ID=URL",
+                   help="article feed for one tab; repeatable")
     p.add_argument("--cache-dir", default=default_cache_dir())
     p.add_argument("--force", action="store_true", help="ignore intervals")
     p.add_argument("--fixtures", default="",
@@ -83,6 +72,13 @@ def parse_args(argv):
                    help="notification program; empty disables alerts")
     p.add_argument("--now", type=float, default=None, help=argparse.SUPPRESS)
     return p.parse_args(argv)
+
+
+def feed_arg(value):
+    feed_id, sep, url = str(value).partition("=")
+    if not sep or not feed_id.strip() or not url.strip():
+        raise argparse.ArgumentTypeError(f"expected ID=URL, got {value!r}")
+    return feed_id.strip(), url.strip()
 
 
 def default_cache_dir():
@@ -226,11 +222,6 @@ def ticker_games(games, now, favourites_only=False):
 
 # ------------------------------------------------------------------ articles
 
-def section_url(args, section):
-    configured = {"news": args.news_feed, "business": args.business_feed}.get(section, "")
-    return configured.strip() or SECTIONS[section]["default"]
-
-
 def rss_date(value):
     try:
         return email.utils.parsedate_to_datetime(value).isoformat() if value else ""
@@ -261,8 +252,8 @@ def atom_link(entry):
     return ""
 
 
-def parse_feed(raw, host=None):
-    """Articles from an RSS 2.0 or Atom feed, optionally only those on `host`."""
+def parse_feed(raw):
+    """Channel title and articles from an RSS 2.0 or Atom feed."""
     root = ET.fromstring(raw)
     items = []
     for item in root.findall("channel/item"):
@@ -282,9 +273,11 @@ def parse_feed(raw, host=None):
             "published": iso_date(entry.findtext(ATOM + "published") or entry.findtext(ATOM + "updated")),
             "image": thumb.get("url", "") if thumb is not None else "",
         })
-    if host:
-        items = [i for i in items if urllib.parse.urlparse(i["link"]).netloc == host]
-    return [i for i in items if i["title"] and i["link"]]
+    if root.tag == ATOM + "feed":
+        title = root.findtext(ATOM + "title")
+    else:
+        title = root.findtext("channel/title")
+    return (title or "").strip(), [i for i in items if i["title"] and i["link"]]
 
 
 # -------------------------------------------------------------------- alerts
@@ -439,7 +432,7 @@ def run(args):
         score_interval = args.live_interval if needs_live_polling(prev.get("games", []), now, args.idle_interval) \
             else args.idle_interval
         scores_due = args.force or reconfigured or now - prev.get("scoresFetchedAt", 0) >= score_interval
-        feeds = {section: section_url(args, section) for section in SECTIONS}
+        feeds = dict(args.feed)
         news_due = args.force or now - prev.get("newsFetchedAt", 0) >= args.news_interval \
             or prev.get("feeds") != feeds
         if not scores_due and not news_due:
@@ -476,18 +469,20 @@ def run(args):
                 if not reconfigured:
                     send_alerts(alert_events(prev_games, games, args.alerts), args.notify_cmd)
 
-            if feed_jobs:
-                articles, failed = {}, False
-                old_articles, old_feeds = prev.get("articles", {}), prev.get("feeds", {})
-                for section, job in feed_jobs.items():
+            if news_due:
+                articles, titles, failed = {}, {}, False
+                old_articles, old_titles, old_feeds = prev.get("articles", {}), prev.get("titles", {}), prev.get("feeds", {})
+                for slot, job in feed_jobs.items():
                     try:
-                        articles[section] = parse_feed(job.result(), SECTIONS[section]["host"])
+                        titles[slot], articles[slot] = parse_feed(job.result())
                     except Exception as exc:  # Keep the last good articles from the same feed.
                         failed = True
-                        same_feed = old_feeds.get(section) == feeds[section]
-                        articles[section] = old_articles.get(section, []) if same_feed else []
-                        out["errors"].append(f"{SECTIONS[section]['label']}: {exc}")
+                        same_feed = old_feeds.get(slot) == feeds[slot]
+                        articles[slot] = old_articles.get(slot, []) if same_feed else []
+                        titles[slot] = old_titles.get(slot, "") if same_feed else ""
+                        out["errors"].append(f"{urllib.parse.urlparse(feeds[slot]).netloc}: {exc}")
                 out["articles"] = articles
+                out["titles"] = titles
                 # After a failure, retry in a minute rather than on every widget tick.
                 out["newsFetchedAt"] = now - args.news_interval + 60 if failed else now
 

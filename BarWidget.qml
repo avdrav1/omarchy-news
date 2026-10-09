@@ -6,8 +6,8 @@ import qs.Commons
 import qs.Ui
 
 // Sports scores and news for the bar: a newspaper icon plus a continuously
-// scrolling ticker, and a popup with the full scoreboard, the News, Business
-// and NYT Cooking articles, and the settings. All fetching happens in
+// scrolling ticker, and a popup with the full scoreboard, up to four
+// configurable article tabs, and the settings. All fetching happens in
 // bin/av-news-fetch, which writes one cache file; this widget only runs the
 // helper on a timer and draws whatever the cache holds, so every monitor's
 // copy shows the same data and alerts fire once.
@@ -36,12 +36,9 @@ Panel {
 
   readonly property string leagues: String(setting("leagues", "soccer/eng.1,basketball/nba"))
   readonly property string teams: String(setting("teams", ""))
-  readonly property var tickerSources: String(setting("tickerSources", "scores,cooking")).split(",")
+  readonly property var tickerSources: String(setting("tickerSources", "scores,tab1")).split(",")
     .map(function(s) { return s.trim() }).filter(function(s) { return s !== "" })
   readonly property string tickerTeams: String(setting("tickerTeams", "favorites"))
-  // Empty means the helper's default (NYT Top Stories / NYT Business).
-  readonly property string newsFeed: String(setting("newsFeed", ""))
-  readonly property string businessFeed: String(setting("businessFeed", ""))
   readonly property string alerts: String(setting("alerts", "favorites"))
   readonly property int hourCycle: Number(setting("hourCycle", 12)) === 24 ? 24 : 12
   readonly property int tickerWidth: Math.max(80, Math.min(800, Number(setting("tickerWidth", 240)) || 240))
@@ -51,10 +48,16 @@ Panel {
   readonly property var settingDefaults: ({
     leagues: "soccer/eng.1,basketball/nba",
     teams: "",
-    tickerSources: "scores,cooking",
+    tickerSources: "scores,tab1",
     tickerTeams: "favorites",
-    newsFeed: "",
-    businessFeed: "",
+    tab1: "news",
+    tab2: "business",
+    tab3: "technology",
+    tab4: "science",
+    tab1Url: "",
+    tab2Url: "",
+    tab3Url: "",
+    tab4Url: "",
     alerts: "favorites",
     hourCycle: 12,
     tickerWidth: 240,
@@ -75,12 +78,58 @@ Panel {
   readonly property var games: feed && feed.games ? feed.games : []
   readonly property var articles: feed && feed.articles ? feed.articles : ({})
 
-  // Article tabs, in display and ticker order.
-  readonly property var sections: [
-    { id: "news", label: "News" },
-    { id: "business", label: "Business" },
-    { id: "cooking", label: "Cooking" }
+  // NYT categories an article tab can show; the helper fetches whatever URL
+  // each tab resolves to.
+  readonly property string nytFeedBase: "https://rss.nytimes.com/services/xml/rss/nyt/"
+  readonly property var presets: [
+    { id: "news", label: "News", name: "NYT Top Stories", section: "HomePage" },
+    { id: "business", label: "Business", name: "NYT Business", section: "Business" },
+    { id: "technology", label: "Tech", name: "NYT Technology", section: "Technology" },
+    { id: "science", label: "Science", name: "NYT Science", section: "Science" },
+    { id: "world", label: "World", name: "NYT World", section: "World" },
+    { id: "politics", label: "Politics", name: "NYT Politics", section: "Politics" },
+    { id: "health", label: "Health", name: "NYT Health", section: "Health" },
+    { id: "climate", label: "Climate", name: "NYT Climate", section: "Climate" },
+    { id: "arts", label: "Arts", name: "NYT Arts", section: "Arts" }
   ]
+  readonly property var slotOptions: presets.map(function(p) { return { value: p.id, label: p.name } })
+    .concat([{ value: "custom", label: "Custom RSS/Atom URL" }, { value: "off", label: "Off" }])
+
+  // The four article-tab settings as configured, including ones that are off.
+  readonly property var slots: [1, 2, 3, 4].map(function(n) {
+    var id = "tab" + n
+    return {
+      id: id,
+      category: String(setting(id, settingDefaults[id])),
+      url: String(setting(id + "Url", "")).trim()
+    }
+  })
+
+  // Article tabs that are on, in display and ticker order. A custom feed is
+  // labelled with its own title once fetched.
+  readonly property var sections: {
+    var titles = feed && feed.titles ? feed.titles : {}
+    var out = []
+    slots.forEach(function(slot) {
+      if (slot.category === "custom") {
+        if (slot.url !== "")
+          out.push({ id: slot.id, category: "custom", label: shortTitle(titles[slot.id]) || "Custom", url: slot.url })
+        return
+      }
+      var preset = presets.find(function(p) { return p.id === slot.category })
+      if (preset)
+        out.push({ id: slot.id, category: preset.id, label: preset.label, url: nytFeedBase + preset.section + ".xml" })
+    })
+    return out
+  }
+  onSectionsChanged: if (panelTab !== "scores" && !sections.some(function(s) { return s.id === panelTab })) panelTab = "scores"
+
+  // "Hacker News: Front Page" -> "Hacker News", capped to fit a tab chip.
+  function shortTitle(title) {
+    var short = String(title || "").split(/\s+[-|—>]\s+|:\s+/)[0].trim()
+    return short.length > 12 ? short.slice(0, 11) + "…" : short
+  }
+
   readonly property var leagueList: feed && feed.leagues ? feed.leagues : []
   readonly property int liveCount: games.filter(function(g) { return g.state === "in" }).length
   readonly property bool busy: fetchProc.running
@@ -155,9 +204,8 @@ Panel {
       "--leagues", leagues,
       "--teams", teams,
       "--alerts", alerts,
-      "--hour-cycle", String(hourCycle),
-      "--news-feed", newsFeed,
-      "--business-feed", businessFeed]
+      "--hour-cycle", String(hourCycle)]
+    sections.forEach(function(s) { argv.push("--feed", s.id + "=" + s.url) })
     if (force) argv.push("--force")
     fetchProc.command = argv
     fetchProc.running = true
@@ -200,7 +248,8 @@ Panel {
 
   // A settings change refetches straight away (the helper sees the new
   // configuration); debounced so typing a team list doesn't spawn a run per key.
-  readonly property string fetchKey: JSON.stringify([leagues, teams, alerts, hourCycle, newsFeed, businessFeed])
+  readonly property string fetchKey: JSON.stringify([leagues, teams, alerts, hourCycle,
+    sections.map(function(s) { return s.id + "=" + s.url })])
   onFetchKeyChanged: fetchDebounce.restart()
 
   Timer {
@@ -278,9 +327,13 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { root.refreshNow(); return "ok" }
-    // Opens the popup on a tab: `omarchy-shell av.news tab business`.
+    // Opens the popup on a tab by slot or category: `omarchy-shell av.news tab technology`.
     function tab(name: string): string {
-      if (name !== "scores" && !root.sections.some(function(s) { return s.id === name })) return "unknown tab: " + name
+      if (name !== "scores") {
+        var section = root.sections.find(function(s) { return s.id === name || s.category === name })
+        if (!section) return "unknown tab: " + name
+        name = section.id
+      }
       root.panelTab = name
       root.open()
       return "ok"
@@ -294,8 +347,12 @@ Panel {
 
   // -------------------------------------------------------------------- bar
 
-  readonly property bool showIcon: vertical || displayMode !== "text"
-  readonly property bool showTicker: !vertical && displayMode !== "icon"
+  // No source picked (or only tabs that are now off): the ticker collapses
+  // and the icon stays, even in text mode, so the widget remains clickable.
+  readonly property bool tickerEnabled: tickerSources.indexOf("scores") >= 0
+    || sections.some(function(s) { return tickerSources.indexOf(s.id) >= 0 })
+  readonly property bool showTicker: !vertical && displayMode !== "icon" && tickerEnabled
+  readonly property bool showIcon: vertical || displayMode !== "text" || !showTicker
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
