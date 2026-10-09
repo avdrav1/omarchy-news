@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "av.news",
   "name": "News & Scores",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": "av",
   "description": "Live sports scores (ESPN) and news headlines in a scrolling bar ticker with a detail popup",
   "kinds": [

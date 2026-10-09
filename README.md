@@ -27,8 +27,8 @@ places the widget in the bar's left section. To put it somewhere else:
 omarchy bar move av.news --section right
 ```
 
-Requirements: an Omarchy release with `omarchy plugin add`, and `python3` on the
-`PATH` (the fetch helper uses only the standard library).
+Requirements: Omarchy 4.0.4 or newer (release or dev builds), and `python3` on
+the `PATH` (the fetch helper uses only the standard library).
 
 ### Update
 
@@ -48,6 +48,17 @@ omarchy plugin remove av.news
 
 This also takes the widget out of the bar and drops its settings. The cache in
 `~/.cache/av.news` stays; delete it by hand if you like.
+
+### Troubleshooting
+
+If the widget doesn't show up in the bar:
+
+1. Check that it's enabled and placed: `omarchy plugin list | grep av.news`
+   should say `enabled`. If not, run `omarchy plugin enable av.news --section left`.
+2. Update and restart: `omarchy plugin update av.news && omarchy restart shell`.
+   Versions before 1.4.1 failed to load on release builds of Omarchy.
+3. Look for load errors in the shell log:
+   `qs log "$(ls -td /run/user/$UID/quickshell/by-id/*/ | head -1)log.qslog" | grep av.news`
 
 ## Use
 

@@ -3,6 +3,7 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // Sports scores and news for the bar: a newspaper icon plus a continuously
@@ -20,11 +21,11 @@ Panel {
   // ------------------------------------------------------------------ theme
 
   readonly property var tokens: bar && "visualTokens" in bar && bar.visualTokens ? bar.visualTokens : null
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color ink: tokens && typeof tokens.widgetContentColor === "function"
     ? tokens.widgetContentColor(settings, root.barForeground)
     : root.barForeground
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool vertical: bar ? bar.vertical : false
@@ -330,7 +331,10 @@ Panel {
     }
   }
 
-  ShellIpc {
+  // IpcHandler rather than the newer ShellIpc wrapper: release builds of the
+  // shell don't have ShellIpc, and a missing type stops the whole widget from
+  // loading. omarchy-shell falls back to qs ipc for plain handlers.
+  IpcHandler {
     target: root.ipcTarget
     function open(): void { root.open() }
     function close(): void { root.close() }
