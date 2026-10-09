@@ -78,19 +78,20 @@ Panel {
   readonly property var games: feed && feed.games ? feed.games : []
   readonly property var articles: feed && feed.articles ? feed.articles : ({})
 
-  // NYT categories an article tab can show; the helper fetches whatever URL
-  // each tab resolves to.
+  // Categories an article tab can show; the helper fetches whatever URL each
+  // tab resolves to.
   readonly property string nytFeedBase: "https://rss.nytimes.com/services/xml/rss/nyt/"
   readonly property var presets: [
-    { id: "news", label: "News", name: "NYT Top Stories", section: "HomePage" },
-    { id: "business", label: "Business", name: "NYT Business", section: "Business" },
-    { id: "technology", label: "Tech", name: "NYT Technology", section: "Technology" },
-    { id: "science", label: "Science", name: "NYT Science", section: "Science" },
-    { id: "world", label: "World", name: "NYT World", section: "World" },
-    { id: "politics", label: "Politics", name: "NYT Politics", section: "Politics" },
-    { id: "health", label: "Health", name: "NYT Health", section: "Health" },
-    { id: "climate", label: "Climate", name: "NYT Climate", section: "Climate" },
-    { id: "arts", label: "Arts", name: "NYT Arts", section: "Arts" }
+    { id: "news", label: "News", name: "NYT Top Stories", url: nytFeedBase + "HomePage.xml" },
+    { id: "business", label: "Business", name: "NYT Business", url: nytFeedBase + "Business.xml" },
+    { id: "technology", label: "Tech", name: "NYT Technology", url: nytFeedBase + "Technology.xml" },
+    { id: "science", label: "Science", name: "NYT Science", url: nytFeedBase + "Science.xml" },
+    { id: "world", label: "World", name: "NYT World", url: nytFeedBase + "World.xml" },
+    { id: "politics", label: "Politics", name: "NYT Politics", url: nytFeedBase + "Politics.xml" },
+    { id: "health", label: "Health", name: "NYT Health", url: nytFeedBase + "Health.xml" },
+    { id: "climate", label: "Climate", name: "NYT Climate", url: nytFeedBase + "Climate.xml" },
+    { id: "arts", label: "Arts", name: "NYT Arts", url: nytFeedBase + "Arts.xml" },
+    { id: "omarchy", label: "Omarchy", name: "Omarchy News", url: "https://omarchy.org/news/rss.xml" }
   ]
   readonly property var slotOptions: presets.map(function(p) { return { value: p.id, label: p.name } })
     .concat([{ value: "custom", label: "Custom RSS/Atom URL" }, { value: "off", label: "Off" }])
@@ -118,7 +119,7 @@ Panel {
       }
       var preset = presets.find(function(p) { return p.id === slot.category })
       if (preset)
-        out.push({ id: slot.id, category: preset.id, label: preset.label, url: nytFeedBase + preset.section + ".xml" })
+        out.push({ id: slot.id, category: preset.id, label: preset.label, url: preset.url })
     })
     return out
   }

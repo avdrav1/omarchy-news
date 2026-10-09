@@ -6,7 +6,8 @@ holding the full scoreboard, up to four article tabs, and settings.
 
 No API keys. Scores come from ESPN's public scoreboard JSON. Each article tab
 shows an NYT section (News/Top Stories, Business, Technology, Science, World,
-Politics, Health, Climate, Arts) or any RSS or Atom feed, or is off.
+Politics, Health, Climate, Arts), [Omarchy News](https://omarchy.org/news), any
+RSS or Atom feed, or is off.
 
 ## Install
 
@@ -48,7 +49,7 @@ Edited from the popup's settings page, or inline on the widget's entry in
 | `leagues` | `soccer/eng.1,basketball/nba` | ESPN `sport/league` paths, e.g. `football/nfl`, `hockey/nhl`, `baseball/mlb`, `soccer/uefa.champions` |
 | `teams` | `""` | Favourite team abbreviations or names; they lead the ticker and drive alerts |
 | `tickerSources` | `scores,tab1` | Any of `scores`, `tab1`–`tab4`, comma-separated; none (or only tabs that are off) hides the ticker, leaving the icon |
-| `tab1`–`tab4` | `news`, `business`, `technology`, `science` | Article tab content: `news`, `business`, `technology`, `science`, `world`, `politics`, `health`, `climate`, `arts` (NYT sections), `custom`, or `off` |
+| `tab1`–`tab4` | `news`, `business`, `technology`, `science` | Article tab content: `news`, `business`, `technology`, `science`, `world`, `politics`, `health`, `climate`, `arts` (NYT sections), `omarchy` ([Omarchy News](https://omarchy.org/news/rss.xml)), `custom`, or `off` |
 | `tab1Url`–`tab4Url` | `""` | RSS or Atom URL for a `custom` tab; the tab is labelled with the feed's own title |
 | `tickerTeams` | `favorites` | `favorites` shows only your teams' games while any is on (live, final in the last 12 h, or within 7 days); otherwise all games. `all` always shows every game |
 | `alerts` | `favorites` | `off`, `favorites` or `all` |
