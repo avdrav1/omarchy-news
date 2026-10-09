@@ -46,6 +46,7 @@ Edited from the popup's settings page, or inline on the widget's entry in
 
 | Key | Default | Meaning |
 |---|---|---|
+| `showScores` | `true` | `false` hides the Scores tab and the ticker's games, and stops score fetches and alerts. From the CLI pass `--json` so it is stored as a boolean: `omarchy bar set av.news showScores false --json` |
 | `leagues` | `soccer/eng.1,basketball/nba` | ESPN `sport/league` paths, e.g. `football/nfl`, `hockey/nhl`, `baseball/mlb`, `soccer/uefa.champions` |
 | `teams` | `""` | Favourite team abbreviations or names; they lead the ticker and drive alerts |
 | `tickerSources` | `scores,tab1` | Any of `scores`, `tab1`–`tab4`, comma-separated; none (or only tabs that are off) hides the ticker, leaving the icon |

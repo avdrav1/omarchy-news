@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "av.news",
   "name": "News & Scores",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "av",
   "description": "Live sports scores (ESPN) and news headlines in a scrolling bar ticker with a detail popup",
   "kinds": [
@@ -18,6 +18,7 @@
     "defaultSection": "left",
     "allowMultiple": false,
     "defaults": {
+      "showScores": true,
       "leagues": "soccer/eng.1,basketball/nba",
       "teams": "",
       "tickerSources": "scores,tab1",
@@ -37,6 +38,7 @@
       "displayMode": "full"
     },
     "schema": [
+      { "key": "showScores", "type": "boolean", "label": "Sports scores", "defaultValue": true, "description": "Off hides the Scores tab and ticker games and stops score fetches and alerts" },
       { "key": "leagues", "type": "string", "label": "Leagues", "defaultValue": "soccer/eng.1,basketball/nba", "description": "Comma-separated ESPN sport/league paths, e.g. soccer/eng.1, basketball/nba, football/nfl, hockey/nhl, baseball/mlb" },
       { "key": "teams", "type": "string", "label": "Favourite teams", "defaultValue": "", "description": "Comma-separated team abbreviations or names; favourites lead the ticker and get alerts" },
       { "key": "tickerSources", "type": "multiselect", "label": "Ticker shows", "defaultValue": "scores,tab1", "options": ["scores", "tab1", "tab2", "tab3", "tab4"] },

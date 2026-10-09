@@ -27,13 +27,13 @@ KeyboardPanel {
   readonly property color selectedFill: Style.selectedFillFor(foreground, Color.accent)
   readonly property color hoverFill: Style.hoverFillFor(foreground, Color.accent)
 
-  readonly property string tab: widget.panelTab
+  readonly property string tab: widget.currentTab
   property int cursor: -1
 
-  readonly property var tabIds: ["scores"].concat(widget.sections.map(function(s) { return s.id }))
-  readonly property var tabOptions: [{ value: "scores", label: "Scores" }].concat(
+  readonly property var tabIds: widget.tabIds
+  readonly property var tabOptions: (widget.showScores ? [{ value: "scores", label: "Scores" }] : []).concat(
     widget.sections.map(function(s) { return { value: s.id, label: s.label } }))
-  readonly property var tabArticles: tab === "scores" ? [] : (widget.articles[tab] || [])
+  readonly property var tabArticles: tab === "scores" || tab === "" ? [] : (widget.articles[tab] || [])
 
   // The rows the cursor walks: games in league order, or the tab's articles.
   readonly property var rows: {
@@ -47,6 +47,7 @@ KeyboardPanel {
   }
 
   function stepTab(direction) {
+    if (tabIds.length === 0) return
     var i = tabIds.indexOf(tab)
     panel.widget.panelTab = tabIds[(i + direction + tabIds.length) % tabIds.length]
   }
@@ -183,7 +184,7 @@ KeyboardPanel {
         }
 
         ButtonGroup {
-          visible: !panel.widget.settingsOpen
+          visible: !panel.widget.settingsOpen && panel.tabIds.length > 0
           options: panel.tabOptions
           value: panel.tab
           foreground: panel.foreground
@@ -280,7 +281,10 @@ KeyboardPanel {
           Text {
             visible: panel.tabArticles.length === 0
             textFormat: Text.PlainText
-            text: panel.widget.feed ? "No articles in this feed" : "Loading…"
+            text: panel.tab === "" ? "Scores and every article tab are off; press s to turn one on"
+              : panel.widget.feed ? "No articles in this feed" : "Loading…"
+            width: parent.width
+            wrapMode: Text.WordWrap
             color: panel.dim
             font.family: panel.fontFamily
             font.pixelSize: Style.font.body
@@ -454,8 +458,20 @@ KeyboardPanel {
       fontFamily: panel.fontFamily
     }
 
+    ChoiceRow {
+      width: parent.width
+      label: "Scores"
+      options: [
+        { value: "on", label: "On" },
+        { value: "off", label: "Off" }
+      ]
+      value: panel.widget.showScores ? "on" : "off"
+      onChanged: function(v) { panel.widget.saveSetting("showScores", v === "on") }
+    }
+
     TextRow {
       id: leaguesRow
+      visible: panel.widget.showScores
       width: parent.width
       label: "Leagues (ESPN paths: soccer/eng.1, basketball/nba, football/nfl, hockey/nhl, baseball/mlb, soccer/uefa.champions)"
       placeholder: "soccer/eng.1,basketball/nba"
@@ -465,6 +481,7 @@ KeyboardPanel {
 
     TextRow {
       id: teamsRow
+      visible: panel.widget.showScores
       width: parent.width
       label: "Favourite teams (abbreviations or names, e.g. ARS, LAL). Favourites lead the ticker and get alerts."
       placeholder: "ARS,LAL"
@@ -474,6 +491,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      visible: panel.widget.showScores
       label: "Alerts"
       options: [
         { value: "off", label: "Off" },
@@ -486,6 +504,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      visible: panel.widget.showScores
       label: "Clock"
       options: [
         { value: "12", label: "12h" },
@@ -513,21 +532,26 @@ KeyboardPanel {
     }
 
     // Any mix of sources; saved in tab order so the ticker order is stable.
+    // Sources that are switched off keep their ticker choice for when they return.
     MultiSelect {
       id: sourcesSelect
       width: parent.width
       label: "Ticker shows"
-      values: panel.widget.tickerSources
+      values: panel.widget.tickerSources.filter(function(t) { return panel.tabIds.indexOf(t) >= 0 })
       options: panel.tabOptions
       foreground: panel.foreground
       fontFamily: panel.fontFamily
       onChanged: function(vals) {
-        panel.widget.saveSetting("tickerSources", panel.tabIds.filter(function(t) { return vals.indexOf(t) >= 0 }).join(","))
+        var current = panel.widget.tickerSources
+        panel.widget.saveSetting("tickerSources", ["scores", "tab1", "tab2", "tab3", "tab4"].filter(function(t) {
+          return panel.tabIds.indexOf(t) >= 0 ? vals.indexOf(t) >= 0 : current.indexOf(t) >= 0
+        }).join(","))
       }
     }
 
     ChoiceRow {
       width: parent.width
+      visible: panel.widget.showScores
       label: "Games"
       options: [
         { value: "favorites", label: "Favourites" },

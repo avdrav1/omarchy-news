@@ -34,6 +34,9 @@ Panel {
   // --------------------------------------------------------------- settings
   // Inline on the widget's shell.json layout entry; see manifest.json.
 
+  // Off drops the Scores tab and the ticker's games, and stops ESPN fetches
+  // and alerts (the helper gets no leagues).
+  readonly property bool showScores: String(setting("showScores", true)) !== "false"
   readonly property string leagues: String(setting("leagues", "soccer/eng.1,basketball/nba"))
   readonly property string teams: String(setting("teams", ""))
   readonly property var tickerSources: String(setting("tickerSources", "scores,tab1")).split(",")
@@ -46,6 +49,7 @@ Panel {
   readonly property string displayMode: String(setting("displayMode", "full"))
 
   readonly property var settingDefaults: ({
+    showScores: true,
     leagues: "soccer/eng.1,basketball/nba",
     teams: "",
     tickerSources: "scores,tab1",
@@ -123,7 +127,11 @@ Panel {
     })
     return out
   }
-  onSectionsChanged: if (panelTab !== "scores" && !sections.some(function(s) { return s.id === panelTab })) panelTab = "scores"
+
+  // Popup tabs in order. currentTab is the tab actually shown: the chosen one,
+  // or the first available if that was turned off ("" when nothing is on).
+  readonly property var tabIds: (showScores ? ["scores"] : []).concat(sections.map(function(s) { return s.id }))
+  readonly property string currentTab: tabIds.indexOf(panelTab) >= 0 ? panelTab : (tabIds.length > 0 ? tabIds[0] : "")
 
   // "Hacker News: Front Page" -> "Hacker News", capped to fit a tab chip.
   function shortTitle(title) {
@@ -144,7 +152,7 @@ Panel {
     var out = []
     var ticker = feed && feed.ticker ? feed.ticker : null
     if (!ticker) return out
-    if (tickerSources.indexOf("scores") >= 0) {
+    if (showScores && tickerSources.indexOf("scores") >= 0) {
       // Favourites only while any of them has a game in the ticker window;
       // otherwise every game, so the ticker never goes blank on an off day.
       var favourites = ticker.favorites || []
@@ -165,7 +173,7 @@ Panel {
     var lines = games.filter(function(g) { return g.state === "in" }).map(function(g) {
       return g.leagueShort + "  " + g.away.abbr + " " + g.away.score + "–" + g.home.score + " " + g.home.abbr + "  " + g.detail
     })
-    if (lines.length === 0) lines.push("No live games")
+    if (showScores && lines.length === 0) lines.push("No live games")
     lines.push("Updated " + ago(feed.updatedAt * 1000))
     return lines.join("\n")
   }
@@ -202,7 +210,7 @@ Panel {
       return
     }
     var argv = ["python3", helperPath,
-      "--leagues", leagues,
+      "--leagues", showScores ? leagues : "",
       "--teams", teams,
       "--alerts", alerts,
       "--hour-cycle", String(hourCycle)]
@@ -249,7 +257,7 @@ Panel {
 
   // A settings change refetches straight away (the helper sees the new
   // configuration); debounced so typing a team list doesn't spawn a run per key.
-  readonly property string fetchKey: JSON.stringify([leagues, teams, alerts, hourCycle,
+  readonly property string fetchKey: JSON.stringify([showScores ? leagues : "", teams, alerts, hourCycle,
     sections.map(function(s) { return s.id + "=" + s.url })])
   onFetchKeyChanged: fetchDebounce.restart()
 
@@ -330,7 +338,7 @@ Panel {
     function refresh(): string { root.refreshNow(); return "ok" }
     // Opens the popup on a tab by slot or category: `omarchy-shell av.news tab technology`.
     function tab(name: string): string {
-      if (name !== "scores") {
+      if (name !== "scores" || !root.showScores) {
         var section = root.sections.find(function(s) { return s.id === name || s.category === name })
         if (!section) return "unknown tab: " + name
         name = section.id
@@ -348,9 +356,9 @@ Panel {
 
   // -------------------------------------------------------------------- bar
 
-  // No source picked (or only tabs that are now off): the ticker collapses
+  // No source picked (or only scores/tabs that are now off): the ticker collapses
   // and the icon stays, even in text mode, so the widget remains clickable.
-  readonly property bool tickerEnabled: tickerSources.indexOf("scores") >= 0
+  readonly property bool tickerEnabled: (showScores && tickerSources.indexOf("scores") >= 0)
     || sections.some(function(s) { return tickerSources.indexOf(s.id) >= 0 })
   readonly property bool showTicker: !vertical && displayMode !== "icon" && tickerEnabled
   readonly property bool showIcon: vertical || displayMode !== "text" || !showTicker
