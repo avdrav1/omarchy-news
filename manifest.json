@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "av.news",
   "name": "News & Scores",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "author": "av",
   "description": "Live sports scores (ESPN) and news headlines in a scrolling bar ticker with a detail popup",
   "kinds": [
@@ -57,7 +57,7 @@
       { "key": "tickerTeams", "type": "enum", "label": "Ticker games", "defaultValue": "favorites", "options": ["favorites", "all"], "description": "Favourites only while any has a game on; otherwise all games" },
       { "key": "alerts", "type": "enum", "label": "Alerts", "defaultValue": "favorites", "options": ["off", "favorites", "all"] },
       { "key": "hourCycle", "type": "enum", "label": "Clock", "defaultValue": 12, "options": [12, 24] },
-      { "key": "tickerWidth", "type": "integer", "label": "Ticker width", "defaultValue": 240, "min": 80, "max": 800, "step": 10 },
+      { "key": "tickerWidth", "type": "integer", "label": "Ticker width", "defaultValue": 240, "min": 80, "max": 1600, "step": 10 },
       { "key": "tickerSpeed", "type": "integer", "label": "Ticker speed (px/s)", "defaultValue": 40, "min": 10, "max": 200, "step": 5 },
       { "key": "displayMode", "type": "enum", "label": "Display", "defaultValue": "full", "options": ["full", "icon", "text"] }
     ]

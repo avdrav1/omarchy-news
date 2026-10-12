@@ -45,7 +45,7 @@ Panel {
   readonly property string tickerTeams: String(setting("tickerTeams", "favorites"))
   readonly property string alerts: String(setting("alerts", "favorites"))
   readonly property int hourCycle: Number(setting("hourCycle", 12)) === 24 ? 24 : 12
-  readonly property int tickerWidth: Math.max(80, Math.min(800, Number(setting("tickerWidth", 240)) || 240))
+  readonly property int tickerWidth: Math.max(80, Math.min(1600, Number(setting("tickerWidth", 240)) || 240))
   readonly property real tickerSpeed: Math.max(10, Math.min(200, Number(setting("tickerSpeed", 40)) || 40))
   readonly property string displayMode: String(setting("displayMode", "full"))
 
