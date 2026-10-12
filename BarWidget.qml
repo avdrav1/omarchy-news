@@ -27,6 +27,9 @@ Panel {
     : root.barForeground
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
+  // Headlines take the theme's accent, so they read as links and follow
+  // theme switches; scores stay in the bar's ink.
+  readonly property color linkColor: Commons.Color.accent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool vertical: bar ? bar.vertical : false
 
@@ -165,7 +168,7 @@ Panel {
     sections.forEach(function(section) {
       if (tickerSources.indexOf(section.id) < 0) return
       out = out.concat((tickerArticles[section.id] || []).map(function(item) {
-        return { text: section.label + ": " + item.text, link: item.link, live: false }
+        return { text: section.label + ": " + item.text, link: item.link, live: false, article: true }
       }))
     })
     return out
@@ -541,7 +544,7 @@ Panel {
         Text {
           textFormat: Text.PlainText
           text: entry.modelData.text
-          color: root.ink
+          color: entry.modelData.article === true ? root.linkColor : root.ink
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
           renderType: Text.NativeRendering

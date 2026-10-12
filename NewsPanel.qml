@@ -420,7 +420,7 @@ KeyboardPanel {
         width: parent.width
         textFormat: Text.PlainText
         text: articleRow.article ? articleRow.article.title : ""
-        color: panel.foreground
+        color: panel.widget.linkColor
         font.family: panel.fontFamily
         font.pixelSize: Style.font.body
         font.bold: true
