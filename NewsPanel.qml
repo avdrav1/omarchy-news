@@ -574,7 +574,9 @@ KeyboardPanel {
       options: [
         { value: "160", label: "S" },
         { value: "240", label: "M" },
-        { value: "360", label: "L" }
+        { value: "360", label: "L" },
+        { value: "800", label: "XL" },
+        { value: "1200", label: "XXL" }
       ]
       value: String(panel.widget.tickerWidth)
       onChanged: function(v) { panel.widget.saveSetting("tickerWidth", parseInt(v, 10)) }
