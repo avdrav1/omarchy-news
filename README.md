@@ -60,6 +60,11 @@ If the widget doesn't show up in the bar:
 3. Look for load errors in the shell log:
    `qs log "$(ls -td /run/user/$UID/quickshell/by-id/*/ | head -1)log.qslog" | grep av.news`
 
+If the widget shows but its tooltip stays on "News & Scores: loading" with an
+empty ticker, update to 1.4.2 or newer and restart the shell. Earlier versions
+missed the first write to an empty cache (a fresh install, or after deleting
+`~/.cache/av.news`) until the next shell restart.
+
 ## Use
 
 | Input | Action |

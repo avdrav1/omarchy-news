@@ -241,6 +241,10 @@ Panel {
     onExited: function(exitCode) {
       if (exitCode === 0) root.helperError = ""
       else if (root.helperError === "") root.helperError = "av-news-fetch failed (exit " + exitCode + ")"
+      // FileView can't watch a file that doesn't exist yet, so on a cold
+      // cache (first run, or ~/.cache/av.news deleted) it would never see
+      // the helper's first write. Reading it once here also arms the watch.
+      if (!root.feedLoaded) feedFile.reload()
       if (root.forceQueued) {
         root.forceQueued = false
         root.runFetch(true)
@@ -270,13 +274,19 @@ Panel {
     onTriggered: root.refresh()
   }
 
+  property bool feedLoaded: false
+
   FileView {
     id: feedFile
     path: root.cacheDir + "/feed.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.applyFeed(text())
+    onLoaded: {
+      root.feedLoaded = true
+      root.applyFeed(text())
+    }
+    onLoadFailed: root.feedLoaded = false
   }
 
   Timer {
