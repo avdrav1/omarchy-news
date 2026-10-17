@@ -49,6 +49,9 @@ Panel {
   readonly property string alerts: String(setting("alerts", "favorites"))
   readonly property int hourCycle: Number(setting("hourCycle", 12)) === 24 ? 24 : 12
   readonly property int tickerWidth: Math.max(80, Math.min(1600, Number(setting("tickerWidth", 240)) || 240))
+  // 1-80: the ticker takes that share of its own screen's width (per monitor,
+  // so one value suits a 4K desktop and a laptop alike); 0 uses tickerWidth.
+  readonly property int tickerWidthPercent: Math.max(0, Math.min(80, Math.round(Number(setting("tickerWidthPercent", 0)) || 0)))
   readonly property real tickerSpeed: Math.max(10, Math.min(200, Number(setting("tickerSpeed", 40)) || 40))
   readonly property string displayMode: String(setting("displayMode", "full"))
 
@@ -71,6 +74,7 @@ Panel {
     alerts: "favorites",
     hourCycle: 12,
     tickerWidth: 240,
+    tickerWidthPercent: 0,
     tickerSpeed: 40
   })
 
@@ -422,12 +426,16 @@ Panel {
       }
 
       // Fixed width on purpose: Shibumi re-runs its responsive layout when a
-      // widget's width changes, so the ticker must not track its text.
+      // widget's width changes, so the ticker must not track its text. A
+      // percentage follows only the screen, never the neighbouring widgets.
       Item {
         id: tickerClip
         anchors.verticalCenter: parent.verticalCenter
         visible: root.showTicker
-        width: Style.space(root.tickerWidth)
+        // Screen.width is 0 until the item is in a window; fall back to px.
+        width: root.tickerWidthPercent > 0 && root.Screen.width > 0
+          ? Math.max(Style.space(80), Math.round(root.Screen.width * root.tickerWidthPercent / 100))
+          : Style.space(root.tickerWidth)
         height: Math.max(firstCopy.implicitHeight, Style.font.body + Style.space(4))
         clip: true
         layer.enabled: root.showTicker && tickerClip.overflowing

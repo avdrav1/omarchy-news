@@ -578,8 +578,26 @@ KeyboardPanel {
         { value: "800", label: "XL" },
         { value: "1200", label: "XXL" }
       ]
-      value: String(panel.widget.tickerWidth)
-      onChanged: function(v) { panel.widget.saveSetting("tickerWidth", parseInt(v, 10)) }
+      // No size is lit while a screen share is in force; picking one ends it.
+      value: panel.widget.tickerWidthPercent > 0 ? "" : String(panel.widget.tickerWidth)
+      onChanged: function(v) {
+        if (panel.widget.tickerWidthPercent > 0) panel.widget.saveSetting("tickerWidthPercent", 0)
+        panel.widget.saveSetting("tickerWidth", parseInt(v, 10))
+      }
+    }
+
+    ChoiceRow {
+      width: parent.width
+      label: "Screen"
+      options: [
+        { value: "0", label: "Off" },
+        { value: "15", label: "15%" },
+        { value: "25", label: "25%" },
+        { value: "33", label: "33%" },
+        { value: "50", label: "50%" }
+      ]
+      value: String(panel.widget.tickerWidthPercent)
+      onChanged: function(v) { panel.widget.saveSetting("tickerWidthPercent", parseInt(v, 10)) }
     }
 
     ChoiceRow {

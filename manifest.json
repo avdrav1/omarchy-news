@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "av.news",
   "name": "News & Scores",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "author": "av",
   "description": "Live sports scores (ESPN) and news headlines in a scrolling bar ticker with a detail popup",
   "kinds": [
@@ -36,6 +36,7 @@
       "alerts": "favorites",
       "hourCycle": 12,
       "tickerWidth": 240,
+      "tickerWidthPercent": 0,
       "tickerSpeed": 40,
       "displayMode": "full"
     },
@@ -58,6 +59,7 @@
       { "key": "alerts", "type": "enum", "label": "Alerts", "defaultValue": "favorites", "options": ["off", "favorites", "all"] },
       { "key": "hourCycle", "type": "enum", "label": "Clock", "defaultValue": 12, "options": [12, 24] },
       { "key": "tickerWidth", "type": "integer", "label": "Ticker width", "defaultValue": 240, "min": 80, "max": 1600, "step": 10 },
+      { "key": "tickerWidthPercent", "type": "integer", "label": "Ticker width (% of screen)", "defaultValue": 0, "min": 0, "max": 80, "step": 1, "description": "Share of the widget's own screen width, so one value fits every monitor; 0 uses Ticker width in px" },
       { "key": "tickerSpeed", "type": "integer", "label": "Ticker speed (px/s)", "defaultValue": 40, "min": 10, "max": 200, "step": 5 },
       { "key": "displayMode", "type": "enum", "label": "Display", "defaultValue": "full", "options": ["full", "icon", "text"] }
     ]

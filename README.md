@@ -111,7 +111,8 @@ omarchy bar set av.news showScores false --json   # booleans need --json
 | `tab1Url`–`tab5Url` | `""` | RSS or Atom URL for a `custom` tab. The tab takes its label from the feed's title |
 | `tickerSources` | `scores,tab1` | What scrolls in the ticker: any of `scores`, `tab1`–`tab5`, comma-separated. With nothing selected the ticker hides and only the icon shows |
 | `tickerTeams` | `favorites` | `favorites` shows only your teams' games while any of them has one on (live, final in the last 12 h, or within 7 days), and every game otherwise. `all` always shows every game |
-| `tickerWidth` | `240` | Ticker width in px. It stays fixed so the bar layout doesn't shift |
+| `tickerWidth` | `240` | Ticker width in px (80–1600). It stays fixed so the bar layout doesn't shift |
+| `tickerWidthPercent` | `0` | Ticker width as a share of its own screen's width (1–80), so one value suits a 4K desktop and a laptop alike. Overrides `tickerWidth`; `0` turns it off |
 | `tickerSpeed` | `40` | Scroll speed in px/s |
 | `displayMode` | `full` | `full` (icon and ticker), `icon`, or `text` |
 
