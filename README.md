@@ -170,3 +170,7 @@ and images belong to their publishers. The widget only links to them.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+Built by [Avniel Dravid](https://github.com/avdrav1) · [LinkedIn](https://www.linkedin.com/in/dravid)
