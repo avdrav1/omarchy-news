@@ -158,6 +158,22 @@ Panel {
     return ""
   }
 
+  // Set by the helper on a git-managed install whose GitHub repo has a newer
+  // manifest version than the one installed.
+  readonly property var updateInfo: feed && feed.update ? feed.update : null
+  readonly property bool updateAvailable: !!(updateInfo && updateInfo.available)
+
+  // The stock updater in a floating terminal: it shows the diff and asks
+  // first. The shell restarts only if the checkout moved, since a running
+  // widget keeps its compiled QML until then.
+  function installUpdate() {
+    var id = moduleName
+    Util.execArgv(["omarchy-launch-floating-terminal-with-presentation",
+      "dir=\"$HOME/.config/omarchy/plugins/" + id + "\"; old=$(git -C \"$dir\" rev-parse HEAD) && "
+      + "omarchy-plugin-update " + id + " && { [[ $(git -C \"$dir\" rev-parse HEAD) == \"$old\" ]] || omarchy-restart-shell; }"])
+    close()
+  }
+
   readonly property var tickerItems: {
     var out = []
     var ticker = feed && feed.ticker ? feed.ticker : null
@@ -185,6 +201,7 @@ Panel {
     })
     if (showScores && lines.length === 0) lines.push("No live games")
     lines.push("Updated " + ago(feed.updatedAt * 1000))
+    if (updateAvailable) lines.push("Update available: " + updateInfo.latest)
     return lines.join("\n")
   }
 
@@ -422,6 +439,19 @@ Panel {
 
         Behavior on color {
           ColorAnimation { duration: 160 }
+        }
+
+        // Update badge: a dot in the theme's accent on the icon's corner. A
+        // child of the glyph, so it never changes the widget's width.
+        Rectangle {
+          visible: root.updateAvailable
+          width: Math.max(4, Math.round(Style.bar.iconFont * 0.32))
+          height: width
+          radius: width / 2
+          color: root.linkColor
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.rightMargin: -Math.round(width / 3)
         }
       }
 

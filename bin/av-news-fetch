@@ -9,6 +9,10 @@ updates the bar. Score changes and finals are diffed against the previous
 cache and announced as desktop notifications from here, which keeps alerts to
 one per event however many monitors are attached.
 
+A git-managed install (what `omarchy plugin add` makes) also checks every few
+hours whether its GitHub repo has a newer manifest version, so the widget can
+offer the update.
+
 Standard library only.
 """
 
@@ -21,6 +25,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -62,6 +67,7 @@ def parse_args(argv):
     p.add_argument("--live-interval", type=int, default=30, help="seconds")
     p.add_argument("--idle-interval", type=int, default=300, help="seconds")
     p.add_argument("--news-interval", type=int, default=900, help="seconds")
+    p.add_argument("--update-interval", type=int, default=6 * 3600, help="seconds between update checks")
     p.add_argument("--feed", action="append", default=[], type=feed_arg, metavar="ID=URL",
                    help="article feed for one tab; repeatable")
     p.add_argument("--cache-dir", default=default_cache_dir())
@@ -71,6 +77,8 @@ def parse_args(argv):
     p.add_argument("--notify-cmd", default=os.environ.get("AV_NEWS_NOTIFY_CMD", "omarchy-notification-send"),
                    help="notification program; empty disables alerts")
     p.add_argument("--now", type=float, default=None, help=argparse.SUPPRESS)
+    p.add_argument("--plugin-dir", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
 
@@ -368,6 +376,41 @@ def send_alerts(events, cmd):
             print(f"av-news-fetch: notification failed: {exc}", file=sys.stderr)
 
 
+# ------------------------------------------------------------------- updates
+
+def installed_version(plugin_dir):
+    try:
+        with open(os.path.join(plugin_dir, "manifest.json"), encoding="utf-8") as fh:
+            return str(json.load(fh).get("version") or "")
+    except (OSError, ValueError, AttributeError):
+        return ""
+
+
+def update_source(plugin_dir):
+    """URL of the manifest on the default branch of the GitHub repo the install
+    was cloned from, which is what `omarchy plugin update` pulls; "" for any
+    other remote."""
+    try:
+        remote = subprocess.run(["git", "-C", plugin_dir, "remote", "get-url", "origin"], check=True,
+                                capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    match = re.search(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/*$", remote)
+    return f"https://raw.githubusercontent.com/{match[1]}/{match[2]}/HEAD/manifest.json" if match else ""
+
+
+def version_key(version):
+    try:
+        return tuple(int(part) for part in str(version).strip().removeprefix("v").split("."))
+    except ValueError:
+        return None
+
+
+def is_newer(latest, installed):
+    latest_key, installed_key = version_key(latest), version_key(installed)
+    return latest_key is not None and installed_key is not None and latest_key > installed_key
+
+
 # --------------------------------------------------------------------- cache
 
 def needs_live_polling(games, now, idle_interval):
@@ -435,18 +478,45 @@ def run(args):
         feeds = dict(args.feed)
         news_due = args.force or now - prev.get("newsFetchedAt", 0) >= args.news_interval \
             or prev.get("feeds") != feeds
-        if not scores_due and not news_due:
+        installed = installed_version(args.plugin_dir)
+        managed = installed != "" and os.path.isdir(os.path.join(args.plugin_dir, ".git"))
+        prev_update = prev.get("update") or {}
+        # A new installed version rechecks at once, so a finished update clears the notice.
+        update_due = managed and (now - prev_update.get("checkedAt", 0) >= args.update_interval
+                                  or prev_update.get("installed") != installed)
+        if not scores_due and not news_due and not update_due:
             return 0
 
         out = dict(prev)
         out.update(version=VERSION, config=config, feeds=feeds, errors=[])
+        if not managed:
+            out.pop("update", None)
         prev_games = prev.get("games", []) if not reconfigured else []
+        update_url = update_source(args.plugin_dir) if update_due else ""
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             board_jobs = {path: pool.submit(fetch, ESPN_SCOREBOARD.format(path=path), args.fixtures)
                           for path in leagues} if scores_due else {}
             feed_jobs = {section: pool.submit(fetch, url, args.fixtures)
                          for section, url in feeds.items()} if news_due else {}
+            update_job = pool.submit(fetch, update_url, args.fixtures) if update_url else None
+
+            if update_due:
+                # Failures stay out of "errors": a missed check is no reason to
+                # paint the popup red. Retry in an hour.
+                latest, error = prev_update.get("latest", ""), ""
+                if update_job:
+                    try:
+                        latest = str(json.loads(update_job.result()).get("version") or "")
+                    except Exception as exc:
+                        error = str(exc)
+                out["update"] = {
+                    "installed": installed,
+                    "latest": latest,
+                    "available": is_newer(latest, installed),
+                    "checkedAt": now - args.update_interval + 3600 if error else now,
+                    "error": error,
+                }
 
             if scores_due:
                 kept = collections.defaultdict(list)

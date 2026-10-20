@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -56,6 +57,7 @@ class FetchCase(unittest.TestCase):
         self.fixtures = os.path.join(self.tmp, "fixtures")
         os.makedirs(self.fixtures)
         self.alerts_log = os.path.join(self.tmp, "alerts.log")
+        self.plugin = os.path.join(self.tmp, "plugin")
         notify = os.path.join(self.tmp, "notify")
         with open(notify, "w") as fh:
             fh.write(f'#!/bin/sh\nprintf "%s|" "$@" >> {self.alerts_log}\necho >> {self.alerts_log}\n')
@@ -84,7 +86,8 @@ class FetchCase(unittest.TestCase):
         if feeds is None:
             feeds = {"tab1": NEWS, "tab2": BUSINESS}
         argv = ["--cache-dir", self.cache, "--fixtures", self.fixtures, "--leagues", leagues,
-                "--teams", teams, "--alerts", alerts, "--notify-cmd", self.notify, "--now", str(now), *extra]
+                "--teams", teams, "--alerts", alerts, "--notify-cmd", self.notify, "--now", str(now),
+                "--plugin-dir", self.plugin, *extra]
         for slot, url in feeds.items():
             argv += ["--feed", f"{slot}={url}"]
         self.assertEqual(fetcher.main(argv), 0)
@@ -301,6 +304,64 @@ class TickerTests(FetchCase):
         ticker = self.run_fetch(leagues=NFL, teams="PIT")["ticker"]
         self.assertEqual([t["text"].split(" · ")[0] for t in ticker["favorites"]], ["IND @ PIT"])
         self.assertEqual([t["text"].split(" · ")[0] for t in ticker["scores"]], ["IND @ PIT", "KC @ DEN"])
+
+
+class UpdateTests(FetchCase):
+    MANIFEST = "https://raw.githubusercontent.com/someone/omarchy-news/HEAD/manifest.json"
+
+    def setUp(self):
+        super().setUp()
+        self.serve(EPL, board("EPL"))
+
+    def install(self, version, remote="https://github.com/someone/omarchy-news.git"):
+        self.set_installed(version)
+        subprocess.run(["git", "init", "-q", self.plugin], check=True)
+        subprocess.run(["git", "-C", self.plugin, "remote", "add", "origin", remote], check=True)
+
+    def set_installed(self, version):
+        os.makedirs(self.plugin, exist_ok=True)
+        with open(os.path.join(self.plugin, "manifest.json"), "w") as fh:
+            json.dump({"id": "av.news", "version": version}, fh)
+
+    def publish(self, version):
+        self.put_feed(self.MANIFEST, body=json.dumps({"id": "av.news", "version": version}))
+
+    def test_newer_release_is_offered_until_installed(self):
+        self.install("1.9.0")
+        self.publish("1.10.0")  # Numerically newer, though "1.10.0" < "1.9.0" as text.
+        update = self.run_fetch()["update"]
+        self.assertEqual((update["available"], update["latest"]), (True, "1.10.0"))
+        self.set_installed("1.10.0")
+        self.assertFalse(self.run_fetch(now=NOW + 60)["update"]["available"])
+
+    def test_github_ssh_remote_is_checked(self):
+        self.install("1.7.0", remote="git@github.com:someone/omarchy-news.git")
+        self.publish("1.8.0")
+        self.assertTrue(self.run_fetch()["update"]["available"])
+
+    def test_checks_at_most_once_per_interval(self):
+        self.install("1.7.0")
+        self.publish("1.7.0")
+        self.assertFalse(self.run_fetch()["update"]["available"])
+        self.publish("1.8.0")
+        self.assertFalse(self.run_fetch(now=NOW + 3600)["update"]["available"])
+        self.assertTrue(self.run_fetch(now=NOW + 6 * 3600)["update"]["available"])
+
+    def test_failed_check_keeps_quiet_and_retries_within_the_hour(self):
+        self.install("1.7.0")
+        feed = self.run_fetch()  # No manifest published: the fetch fails.
+        self.assertEqual((feed["update"]["available"], feed["errors"]), (False, []))
+        self.publish("1.8.0")
+        self.assertTrue(self.run_fetch(now=NOW + 3600)["update"]["available"])
+
+    def test_copied_or_non_github_install_is_never_checked(self):
+        self.set_installed("1.7.0")  # No .git: `omarchy plugin update` couldn't act on it.
+        self.publish("1.8.0")
+        self.assertNotIn("update", self.run_fetch())
+        shutil.rmtree(self.plugin)
+        self.install("1.7.0", remote="https://gitlab.com/someone/omarchy-news.git")
+        update = self.run_fetch(now=NOW + 400)["update"]
+        self.assertEqual((update["available"], update["error"]), (False, ""))
 
 
 if __name__ == "__main__":

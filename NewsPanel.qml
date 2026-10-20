@@ -8,7 +8,8 @@ import qs.Ui
 // own panel tokens and caret.
 //
 // Keys: h/l or 1-6 switch tabs, j/k move, Enter opens, r refreshes,
-// s toggles settings, Tab moves to the next bar popup, Esc closes.
+// s toggles settings, u installs an available update, Tab moves to the next
+// bar popup, Esc closes.
 KeyboardPanel {
   id: panel
 
@@ -119,6 +120,7 @@ KeyboardPanel {
     onTextKey: function(text) {
       if (text === "r") panel.widget.refreshNow()
       else if (text === "s") panel.toggleSettings()
+      else if (text === "u" && !panel.widget.settingsOpen && panel.widget.updateAvailable) panel.widget.installUpdate()
       else if (!panel.widget.settingsOpen && text >= "1" && text <= String(panel.tabIds.length))
         panel.widget.panelTab = panel.tabIds[parseInt(text, 10) - 1]
     }
@@ -183,6 +185,40 @@ KeyboardPanel {
                 onClicked: panel.toggleSettings()
               }
             }
+          }
+        }
+
+        Item {
+          visible: !panel.widget.settingsOpen && panel.widget.updateAvailable
+          width: parent.width
+          implicitHeight: Math.max(updateNote.implicitHeight, updateButton.implicitHeight)
+
+          Text {
+            id: updateNote
+            anchors.left: parent.left
+            anchors.right: updateButton.left
+            anchors.rightMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: panel.widget.updateInfo
+              ? "Update available: " + panel.widget.updateInfo.installed + " → " + panel.widget.updateInfo.latest
+              : ""
+            color: panel.widget.linkColor
+            font.family: panel.fontFamily
+            font.pixelSize: Style.font.body
+            elide: Text.ElideRight
+          }
+
+          Button {
+            id: updateButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Update (u)"
+            bordered: true
+            selected: true
+            foreground: panel.foreground
+            fontFamily: panel.fontFamily
+            onClicked: panel.widget.installUpdate()
           }
         }
 

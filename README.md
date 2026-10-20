@@ -32,6 +32,14 @@ the `PATH` (the fetch helper uses only the standard library).
 
 ### Update
 
+When a new version is out, the newspaper icon gets a dot in the theme's accent,
+the tooltip names the version, and the popup shows an **Update** button (or
+press `u`). It opens `omarchy plugin update` in a terminal, which shows the
+changes and asks first, then restarts the shell if you took the update. The
+check covers installs made with `omarchy plugin add` from GitHub.
+
+To update by hand:
+
 ```bash
 omarchy plugin update av.news
 omarchy restart shell
@@ -75,8 +83,8 @@ missed the first write to an empty cache (a fresh install, or after deleting
 | Hover | Pause the ticker; the tooltip lists live games |
 
 In the popup: `h`/`l` or `1`–`6` switch tabs, `j`/`k` move, `Enter` opens,
-`r` refreshes, `s` toggles settings, `Tab` moves to the next bar popup, `Esc`
-closes.
+`r` refreshes, `s` toggles settings, `u` installs an available update, `Tab`
+moves to the next bar popup, `Esc` closes.
 
 From scripts or key bindings:
 
@@ -142,11 +150,15 @@ no-op, so a multi-monitor setup fetches and alerts once.
 - Article feeds refresh every 15 min, and at once when a tab's feed changes.
 - A league or feed that fails keeps its last good data. A failed feed is
   retried a minute later.
+- Every 6 h, and right after the installed version changes, the helper reads
+  `manifest.json` from the default branch of the GitHub repo the plugin was
+  cloned from and flags an update when its version is higher. A failed check
+  is retried an hour later and never shows as an error.
 
 Network requests go only to ESPN's scoreboard API (`site.api.espn.com`), the
 feeds your tabs point at (`rss.nytimes.com`, `omarchy.org`, or your custom
-URLs), and the article thumbnails those feeds link to. Nothing is sent anywhere
-else.
+URLs), the article thumbnails those feeds link to, and the update check
+(`raw.githubusercontent.com`). Nothing is sent anywhere else.
 
 ## Development
 
