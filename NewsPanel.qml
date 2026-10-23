@@ -412,12 +412,13 @@ KeyboardPanel {
     }
   }
 
-  // Thumbnail (when the feed has one), title and "author · age".
+  // Thumbnail, title and "author · age". The thumbnail slot is always there so
+  // titles line up; without a (loadable) image it shows a newspaper glyph.
   component ArticleRow: RowSurface {
     id: articleRow
     property var article: null
     readonly property bool hasImage: !!(article && article.image)
-    readonly property real thumb: hasImage ? Style.space(56) : 0
+    readonly property real thumb: Style.space(56)
 
     link: article ? article.link : ""
     implicitHeight: Math.max(thumb, articleText.implicitHeight) + Style.space(10)
@@ -426,14 +427,24 @@ KeyboardPanel {
       id: thumbFrame
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      visible: articleRow.hasImage
       width: articleRow.thumb
       height: articleRow.thumb
       radius: Style.cornerRadius
       color: panel.hoverFill
       clip: true
 
+      Text {
+        anchors.centerIn: parent
+        visible: thumbImage.status !== Image.Ready
+        textFormat: Text.PlainText
+        text: panel.widget.newspaperGlyph
+        color: panel.dim
+        font.family: panel.fontFamily
+        font.pixelSize: Style.font.display
+      }
+
       Image {
+        id: thumbImage
         anchors.fill: parent
         source: articleRow.hasImage ? articleRow.article.image : ""
         fillMode: Image.PreserveAspectCrop
@@ -447,7 +458,7 @@ KeyboardPanel {
     Column {
       id: articleText
       anchors.left: thumbFrame.right
-      anchors.leftMargin: articleRow.hasImage ? Style.space(10) : 0
+      anchors.leftMargin: Style.space(10)
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(3)
