@@ -37,6 +37,7 @@ the tooltip names the version, and the popup shows an **Update** button (or
 press `u`). It opens `omarchy plugin update` in a terminal, which shows the
 changes and asks first, then restarts the shell if you took the update. The
 check covers installs made with `omarchy plugin add` from GitHub.
+The version you're running shows next to the popup's title.
 
 To update by hand:
 
@@ -122,7 +123,7 @@ omarchy bar set av.news showScores false --json   # booleans need --json
 | `tickerWidth` | `240` | Ticker width in px (80–1600). It stays fixed so the bar layout doesn't shift |
 | `tickerWidthPercent` | `0` | Ticker width as a share of its own screen's width (1–80), so one value suits a 4K desktop and a laptop alike. Overrides `tickerWidth`; `0` turns it off |
 | `tickerSpeed` | `40` | Scroll speed in px/s |
-| `displayMode` | `full` | `full` (icon and ticker), `icon`, or `text` |
+| `displayMode` | `full` | `full` (icon and ticker), `icon` (ticker off), or `text` (ticker only). The popup's settings call this "Bar shows" |
 
 ## Alerts
 

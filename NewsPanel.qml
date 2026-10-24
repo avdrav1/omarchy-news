@@ -143,6 +143,7 @@ KeyboardPanel {
         PanelHero {
           width: parent.width
           title: "News & Scores"
+          detail: panel.widget.pluginVersion !== "" ? "v" + panel.widget.pluginVersion : ""
           meta: {
             if (panel.widget.settingsOpen) return "Settings"
             var parts = []
@@ -502,6 +503,8 @@ KeyboardPanel {
     readonly property bool editing: leaguesRow.editing || teamsRow.editing
       || slot1Row.editing || slot2Row.editing || slot3Row.editing || slot4Row.editing || slot5Row.editing
       || sourcesSelect.popupOpen
+    // displayMode "icon" is the bar without a ticker; its other rows hide then.
+    readonly property bool tickerOn: panel.widget.displayMode !== "icon"
 
     spacing: Style.space(12)
 
@@ -585,10 +588,23 @@ KeyboardPanel {
       fontFamily: panel.fontFamily
     }
 
+    ChoiceRow {
+      width: parent.width
+      label: "Bar shows"
+      options: [
+        { value: "full", label: "Icon + ticker" },
+        { value: "icon", label: "Icon only" },
+        { value: "text", label: "Ticker only" }
+      ]
+      value: panel.widget.displayMode
+      onChanged: function(v) { panel.widget.saveSetting("displayMode", v) }
+    }
+
     // Any mix of sources; saved in tab order so the ticker order is stable.
     // Sources that are switched off keep their ticker choice for when they return.
     MultiSelect {
       id: sourcesSelect
+      visible: view.tickerOn
       width: parent.width
       label: "Ticker shows"
       values: panel.widget.tickerSources.filter(function(t) { return panel.tabIds.indexOf(t) >= 0 })
@@ -605,7 +621,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
-      visible: panel.widget.showScores
+      visible: view.tickerOn && panel.widget.showScores
       label: "Games"
       options: [
         { value: "favorites", label: "Favourites" },
@@ -617,6 +633,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      visible: view.tickerOn
       label: "Width"
       options: [
         { value: "160", label: "S" },
@@ -635,6 +652,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      visible: view.tickerOn
       label: "Screen"
       options: [
         { value: "0", label: "Off" },
@@ -649,6 +667,7 @@ KeyboardPanel {
 
     ChoiceRow {
       width: parent.width
+      visible: view.tickerOn
       label: "Speed"
       options: [
         { value: "25", label: "Slow" },

@@ -163,6 +163,22 @@ Panel {
   readonly property var updateInfo: feed && feed.update ? feed.update : null
   readonly property bool updateAvailable: !!(updateInfo && updateInfo.available)
 
+  // The version this shell runs: the manifest beside this file, read at load.
+  // An update restarts the shell, which reads it again.
+  property string pluginVersion: ""
+
+  FileView {
+    path: decodeURIComponent(String(Qt.resolvedUrl("manifest.json")).replace(/^file:\/\//, ""))
+    printErrors: false
+    onLoaded: {
+      try {
+        root.pluginVersion = String(JSON.parse(text()).version || "")
+      } catch (e) {
+        root.pluginVersion = ""
+      }
+    }
+  }
+
   // The stock updater in a floating terminal: it shows the diff and asks
   // first. The shell restarts only if the checkout moved, since a running
   // widget keeps its compiled QML until then.
