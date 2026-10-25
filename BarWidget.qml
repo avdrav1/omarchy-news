@@ -53,7 +53,10 @@ Panel {
   // so one value suits a 4K desktop and a laptop alike); 0 uses tickerWidth.
   readonly property int tickerWidthPercent: Math.max(0, Math.min(80, Math.round(Number(setting("tickerWidthPercent", 0)) || 0)))
   readonly property real tickerSpeed: Math.max(10, Math.min(200, Number(setting("tickerSpeed", 40)) || 40))
-  readonly property string displayMode: String(setting("displayMode", "full"))
+  // Not "displayMode": Shibumi gives each widget it groups an appearance
+  // setting of that name (default "full") and passes it in over ours.
+  // displayMode is still read when barShows is unset, for older configs.
+  readonly property string barShows: String(setting("barShows", setting("displayMode", "full")))
 
   readonly property var settingDefaults: ({
     showScores: true,
@@ -416,8 +419,8 @@ Panel {
   // and the icon stays, even in text mode, so the widget remains clickable.
   readonly property bool tickerEnabled: (showScores && tickerSources.indexOf("scores") >= 0)
     || sections.some(function(s) { return tickerSources.indexOf(s.id) >= 0 })
-  readonly property bool showTicker: !vertical && displayMode !== "icon" && tickerEnabled
-  readonly property bool showIcon: vertical || displayMode !== "text" || !showTicker
+  readonly property bool showTicker: !vertical && barShows !== "icon" && tickerEnabled
+  readonly property bool showIcon: vertical || barShows !== "text" || !showTicker
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight

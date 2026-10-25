@@ -503,8 +503,8 @@ KeyboardPanel {
     readonly property bool editing: leaguesRow.editing || teamsRow.editing
       || slot1Row.editing || slot2Row.editing || slot3Row.editing || slot4Row.editing || slot5Row.editing
       || sourcesSelect.popupOpen
-    // displayMode "icon" is the bar without a ticker; its other rows hide then.
-    readonly property bool tickerOn: panel.widget.displayMode !== "icon"
+    // barShows "icon" is the bar without a ticker; its other rows hide then.
+    readonly property bool tickerOn: panel.widget.barShows !== "icon"
 
     spacing: Style.space(12)
 
@@ -596,8 +596,8 @@ KeyboardPanel {
         { value: "icon", label: "Icon only" },
         { value: "text", label: "Ticker only" }
       ]
-      value: panel.widget.displayMode
-      onChanged: function(v) { panel.widget.saveSetting("displayMode", v) }
+      value: panel.widget.barShows
+      onChanged: function(v) { panel.widget.saveSetting("barShows", v) }
     }
 
     // Any mix of sources; saved in tab order so the ticker order is stable.
